@@ -60,11 +60,17 @@ export class ChatServiceV2 {
 
       console.log(`🤖 [${userId}] Procesando: "${cleanMessage}" | Estado: ${state.flujo_actual}/${state.paso_actual}`)
 
-      // 🔄 Actualizar última interacción usando Repository
-      await this.prospectoActualRepo.updateLastInteraction(userId)
-
-      // 1. 🔍 Reconocimiento usando ProspectServiceV2
+      // 1. 🔍 Reconocimiento usando ProspectServiceV2 (PRIMERO)
       const recognition = await this.prospectServiceV2.reconocerProspecto(userId)
+      
+      // 🔄 Actualizar última interacción solo si el prospecto existe
+      if (recognition.success && recognition.data) {
+        try {
+          await this.prospectoActualRepo.updateLastInteraction(userId)
+        } catch (error) {
+          console.warn(`⚠️ [${userId}] No se pudo actualizar última interacción (prospecto nuevo)`)
+        }
+      }
       
       if (!recognition.success) {
         console.error(`❌ [${userId}] Error en reconocimiento:`, recognition.error)

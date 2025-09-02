@@ -45,12 +45,12 @@ export class ProspectServiceV2 {
         tipo_consulta: tipoConsultaPaso,
         nombre: datos.nombre || 'Usuario',
         email: datos.email,
-        telefono: datos.telefono,
+        telefono: datos.telefono || undefined,
         edad: datos.edad,
         region: datos.region,
         metadata: {
           campo_capturado: campo,
-          valor_anterior: datos[campo as keyof ProspectoData],
+          valor_anterior: (datos as any)[campo],
           valor_nuevo: valor,
           timestamp: new Date().toISOString(),
           paso_progressive_capture: this.getProgressiveStep(campo)

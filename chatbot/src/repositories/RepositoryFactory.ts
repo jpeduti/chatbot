@@ -15,8 +15,13 @@ export class RepositoryFactory {
 
   private constructor() {
     this.prisma = new PrismaClient({
-      log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error'],
-      errorFormat: 'pretty'
+      log: process.env.NODE_ENV === 'development' ? ['error'] : ['error'], // Reducir logging
+      errorFormat: 'pretty',
+      datasources: {
+        db: {
+          url: process.env.DATABASE_URL
+        }
+      }
     })
     
     // Handle cleanup on process exit

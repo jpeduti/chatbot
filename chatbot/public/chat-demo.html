@@ -3,257 +3,715 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>UNIACC ChatBot - Demo TypeScript</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <title>🚀 UNIACC Chat Demo v3.0 - Repository Enhanced</title>
     <style>
-        .chat-message { animation: fadeIn 0.3s ease-in; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        
-        .chat-background {
-            background-color: #f0f2f5;
-            background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,.15) 1px, transparent 0);
-            background-size: 20px 20px;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
         }
-        
-        .message-bubble-user {
-            background: #dcf8c6;
-            border-radius: 18px 18px 4px 18px;
-            padding: 8px 12px;
-            margin: 4px 0;
-            align-self: flex-end;
-            max-width: 70%;
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
         }
-        
-        .message-bubble-bot {
+
+        .chat-container {
+            width: 100%;
+            max-width: 1200px;
+            height: 90vh;
             background: white;
-            border-radius: 18px 18px 18px 4px;
-            padding: 8px 12px;
-            margin: 4px 0;
-            align-self: flex-start;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            display: flex;
+            overflow: hidden;
+        }
+
+        /* Panel lateral de control */
+        .control-panel {
+            width: 300px;
+            background: #f8f9fa;
+            border-right: 1px solid #e9ecef;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .control-panel h3 {
+            color: #495057;
+            font-size: 16px;
+            margin-bottom: 10px;
+        }
+
+        .version-selector {
+            display: flex;
+            gap: 10px;
+        }
+
+        .version-btn {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid #007bff;
+            background: white;
+            color: #007bff;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+
+        .version-btn.active {
+            background: #007bff;
+            color: white;
+        }
+
+        .metrics-box {
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #dee2e6;
+        }
+
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .metric-label {
+            color: #6c757d;
+        }
+
+        .metric-value {
+            font-weight: bold;
+            color: #28a745;
+        }
+
+        /* Chat principal */
+        .chat-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-header {
+            background: #075e54;
+            color: white;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .chat-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .chat-title h2 {
+            font-size: 18px;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            background: #25d366;
+            border-radius: 50%;
+        }
+
+        .architecture-badge {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 12px;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #e5ddd5;
+            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="25" cy="25" r="1" fill="%23d4d4d4" opacity="0.1"/><circle cx="75" cy="75" r="1" fill="%23d4d4d4" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+        }
+
+        .message {
+            margin-bottom: 15px;
+            display: flex;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message.user {
+            justify-content: flex-end;
+        }
+
+        .message.bot {
+            justify-content: flex-start;
+        }
+
+        .message-bubble {
             max-width: 70%;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            padding: 12px 16px;
+            border-radius: 18px;
+            position: relative;
+            word-wrap: break-word;
         }
-        
-        .message-time {
+
+        .message.user .message-bubble {
+            background: #dcf8c6;
+            color: #000;
+        }
+
+        .message.bot .message-bubble {
+            background: white;
+            color: #000;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        .message-info {
             font-size: 11px;
-            color: #667;
-            margin-top: 4px;
+            color: #666;
+            margin-top: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
-        
-        .tab-content {
+
+        .version-badge {
+            background: #007bff;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-size: 10px;
+        }
+
+        .processing-time {
+            color: #28a745;
+            font-weight: bold;
+        }
+
+        .chat-input {
+            padding: 20px;
+            background: #f0f0f0;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .input-group {
+            flex: 1;
+            display: flex;
+            gap: 10px;
+        }
+
+        .phone-input {
+            width: 150px;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            outline: none;
+        }
+
+        .message-input {
+            flex: 1;
+            padding: 12px 20px;
+            border: 1px solid #ddd;
+            border-radius: 25px;
+            outline: none;
+            font-size: 14px;
+        }
+
+        .send-btn {
+            width: 50px;
+            height: 50px;
+            background: #075e54;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s;
+        }
+
+        .send-btn:hover {
+            background: #128c7e;
+            transform: scale(1.05);
+        }
+
+        .send-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loading {
+            display: none;
+            padding: 10px;
+            text-align: center;
+            color: #666;
+        }
+
+        .loading.show {
             display: block;
         }
-        
-        .tab-content.hidden {
+
+        .typing-indicator {
             display: none;
+            justify-content: flex-start;
+            margin-bottom: 15px;
         }
-        
-        /* Log styling */
-        .log-info { color: #10b981; }
-        .log-warning { color: #f59e0b; }
-        .log-error { color: #ef4444; }
-        .log-success { color: #22c55e; }
-        .log-timestamp { color: #6b7280; }
-        
-        /* Pulse animation for active tests */
-        .pulse-dot {
-            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+
+        .typing-indicator.show {
+            display: flex;
         }
-        
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: .5; }
+
+        .typing-bubble {
+            background: white;
+            padding: 12px 16px;
+            border-radius: 18px;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        .typing-dots {
+            display: flex;
+            gap: 4px;
+        }
+
+        .typing-dots span {
+            width: 8px;
+            height: 8px;
+            background: #999;
+            border-radius: 50%;
+            animation: typing 1.4s infinite ease-in-out;
+        }
+
+        .typing-dots span:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dots span:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes typing {
+            0%, 80%, 100% {
+                transform: scale(0);
+            }
+            40% {
+                transform: scale(1);
+            }
+        }
+
+        .clear-btn {
+            padding: 8px 16px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .system-info {
+            background: #e3f2fd;
+            border: 1px solid #2196f3;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 10px;
+            font-size: 12px;
         }
     </style>
 </head>
-<body class="bg-gray-100">
-    <div class="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 p-4">
-        <!-- Header -->
-        <div class="bg-white rounded-t-lg shadow-lg border border-gray-200 p-6">
-            <div class="text-center">
-                <h1 class="text-3xl font-bold text-blue-600 mb-2">🎓 UNIACC ChatBot MVP</h1>
-                <p class="text-gray-600">Asistente virtual para captura de prospectos universitarios</p>
+<body>
+    <div class="chat-container">
+        <!-- Panel de Control -->
+        <div class="control-panel">
+            <div>
+                <h3>🎯 Versión del Sistema</h3>
+                <div class="version-selector">
+                    <button class="version-btn active" data-version="v1">V1 Legacy</button>
+                    <button class="version-btn" data-version="v2">V2 Repository</button>
+                </div>
+            </div>
+
+            <div class="system-info">
+                <div><strong>🏗️ Arquitectura:</strong> Service-Based</div>
+                <div><strong>💾 Cache:</strong> Multi-Layer</div>
+                <div><strong>🗄️ ORM:</strong> Prisma + Supabase</div>
+                <div><strong>📊 Analytics:</strong> Real-time</div>
+            </div>
+
+            <div>
+                <h3>📊 Métricas en Tiempo Real</h3>
+                <div class="metrics-box" id="metricsBox">
+                    <div class="metric">
+                        <span class="metric-label">Mensajes:</span>
+                        <span class="metric-value" id="messageCount">0</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Cache Hit:</span>
+                        <span class="metric-value" id="cacheHitRate">0%</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Tiempo Promedio:</span>
+                        <span class="metric-value" id="avgResponseTime">0ms</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">Versión Activa:</span>
+                        <span class="metric-value" id="activeVersion">V1</span>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <h3>🛠️ Acciones</h3>
+                <button class="clear-btn" onclick="clearChat()">🗑️ Limpiar Chat</button>
+                <button class="clear-btn" onclick="clearCache()" style="background: #ffc107; margin-top: 5px;">🧹 Limpiar Cache</button>
+            </div>
+
+            <div>
+                <h3>🧪 Tests Rápidos</h3>
+                <button class="version-btn" onclick="sendQuickTest('hola')" style="margin-bottom: 5px; font-size: 12px;">👋 Test Saludo</button>
+                <button class="version-btn" onclick="sendQuickTest('quiero estudiar ingeniería')" style="margin-bottom: 5px; font-size: 12px;">🎓 Test Carrera</button>
+                <button class="version-btn" onclick="sendQuickTest('necesito información sobre becas')" style="font-size: 12px;">💰 Test Becas</button>
             </div>
         </div>
 
-        <!-- Main Container with Tabs -->
-        <div class="bg-white border-x border-gray-200">
-            <!-- Tab Navigation -->
-            <div class="flex border-b border-gray-200">
-                <button id="chatTab" class="flex-1 p-4 text-center font-semibold border-b-2 border-blue-500 text-blue-600 bg-blue-50">
-                    💬 Chat Interactivo
-                </button>
-                <button id="testingTab" class="flex-1 p-4 text-center font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-800">
-                    🧪 Testing Panel
-                </button>
-                <button id="metricsTab" class="flex-1 p-4 text-center font-semibold border-b-2 border-transparent text-gray-600 hover:text-gray-800">
-                    📊 Métricas en Vivo
-                </button>
+        <!-- Chat Principal -->
+        <div class="chat-main">
+            <div class="chat-header">
+                <div class="chat-title">
+                    <div class="status-indicator"></div>
+                    <h2>🤖 UNIACC Bot Demo</h2>
+                </div>
+                <div class="architecture-badge" id="architectureBadge">
+                    Repository Pattern + Cache
+                </div>
             </div>
 
-            <!-- Chat Tab Content -->
-            <div id="chatContent" class="tab-content">
-                <!-- Chat Area -->
-                <div id="results" class="chat-background p-4 overflow-y-auto flex flex-col space-y-2" style="height: 400px;">
-                    <div class="text-center text-gray-500 text-sm">
-                        💬 Escribe "hola" para comenzar la conversación...
+            <div class="chat-messages" id="chatMessages">
+                <div class="message bot">
+                    <div class="message-bubble">
+                        ¡Hola! 👋 Soy el chatbot de UNIACC v3.0<br><br>
+                        🚀 <strong>Nuevas características:</strong><br>
+                        ✅ Repository Pattern con Prisma<br>
+                        ✅ Cache multi-layer<br>
+                        ✅ Analytics en tiempo real<br>
+                        ✅ Type-safe operations<br><br>
+                        <em>Puedes cambiar entre V1 (Legacy) y V2 (Repository) en el panel lateral</em>
+                    </div>
+                    <div class="message-info">
+                        <span>Sistema inicializado</span>
+                        <span class="version-badge">BIENVENIDA</span>
                     </div>
                 </div>
             </div>
 
-            <!-- Testing Tab Content -->
-            <div id="testingContent" class="tab-content hidden">
-                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 p-4" style="height: 400px;">
-                    <!-- Test Controls -->
-                    <div class="space-y-4">
-                        <h3 class="font-semibold text-gray-800 mb-3">🎮 Controles de Testing</h3>
-                        
-                        <!-- Quick Tests -->
-                        <div class="bg-gray-50 p-3 rounded-lg">
-                            <h4 class="font-medium text-sm text-gray-700 mb-2">Tests Rápidos</h4>
-                            <div class="grid grid-cols-2 gap-2">
-                                <button id="testBasic" class="px-3 py-2 bg-green-500 text-white rounded text-sm hover:bg-green-600">
-                                    🧪 Test Básico
-                                </button>
-                                <button id="testPerformance" class="px-3 py-2 bg-blue-500 text-white rounded text-sm hover:bg-blue-600">
-                                    ⚡ Performance
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Flow-Specific Tests -->
-                        <div class="bg-gray-50 p-3 rounded-lg">
-                            <h4 class="font-medium text-sm text-gray-700 mb-2">🎯 Tests por Flujo</h4>
-                            <div class="space-y-2 max-h-48 overflow-y-auto">
-                                <button id="testCapturaInicial" class="w-full px-2 py-1 bg-indigo-500 text-white rounded text-xs hover:bg-indigo-600 text-left">
-                                    📝 Captura Inicial
-                                </button>
-                                <button id="testMenuPrincipal" class="w-full px-2 py-1 bg-purple-500 text-white rounded text-xs hover:bg-purple-600 text-left">
-                                    🏠 Menú Principal
-                                </button>
-                                <button id="testExploracionCarreras" class="w-full px-2 py-1 bg-pink-500 text-white rounded text-xs hover:bg-pink-600 text-left">
-                                    🔍 Exploración Carreras
-                                </button>
-                                <button id="testDetalleCarrera" class="w-full px-2 py-1 bg-orange-500 text-white rounded text-xs hover:bg-orange-600 text-left">
-                                    📚 Detalle Carrera
-                                </button>
-                                <button id="testProcesoAdmision" class="w-full px-2 py-1 bg-red-500 text-white rounded text-xs hover:bg-red-600 text-left">
-                                    🎓 Proceso Admisión
-                                </button>
-                                <button id="testBusquedaDirecta" class="w-full px-2 py-1 bg-yellow-500 text-white rounded text-xs hover:bg-yellow-600 text-left">
-                                    🔎 Búsqueda Directa
-                                </button>
-                                <button id="testCostosBecas" class="w-full px-2 py-1 bg-emerald-500 text-white rounded text-xs hover:bg-emerald-600 text-left">
-                                    💰 Costos y Becas
-                                </button>
-                                <button id="testModalidades" class="w-full px-2 py-1 bg-teal-500 text-white rounded text-xs hover:bg-teal-600 text-left">
-                                    📖 Modalidades
-                                </button>
-                                <button id="testMenuContextual" class="w-full px-2 py-1 bg-cyan-500 text-white rounded text-xs hover:bg-cyan-600 text-left">
-                                    🎯 Menú Contextual
-                                </button>
-                                <button id="testCapturaAsesor" class="w-full px-2 py-1 bg-slate-500 text-white rounded text-xs hover:bg-slate-600 text-left">
-                                    👨‍💼 Captura Asesor
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Concurrent Testing -->
-                        <div class="bg-gray-50 p-3 rounded-lg">
-                            <h4 class="font-medium text-sm text-gray-700 mb-2">Tests Concurrentes</h4>
-                            <div class="flex items-center gap-2 mb-2">
-                                <label class="text-xs text-gray-600">Usuarios:</label>
-                                <select id="concurrentUsers" class="px-2 py-1 border rounded text-sm">
-                                    <option value="3">3 usuarios</option>
-                                    <option value="5" selected>5 usuarios</option>
-                                    <option value="10">10 usuarios</option>
-                                    <option value="20">20 usuarios</option>
-                                </select>
-                                <button id="testConcurrent" class="px-3 py-1 bg-purple-500 text-white rounded text-sm hover:bg-purple-600">
-                                    🚀 Ejecutar
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Test Status -->
-                        <div class="bg-gray-50 p-3 rounded-lg">
-                            <h4 class="font-medium text-sm text-gray-700 mb-2">Estado</h4>
-                            <div id="testStatus" class="text-sm text-gray-600">
-                                ⏸️ Sin tests ejecutándose
-                            </div>
-                            <button id="stopTests" class="mt-2 px-3 py-1 bg-red-500 text-white rounded text-sm hover:bg-red-600 hidden">
-                                🛑 Detener Tests
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Live Logs -->
-                    <div class="flex flex-col">
-                        <div class="flex justify-between items-center mb-2">
-                            <h3 class="font-semibold text-gray-800">📜 Logs en Tiempo Real</h3>
-                            <button id="clearLogs" class="px-2 py-1 bg-gray-500 text-white rounded text-xs hover:bg-gray-600">
-                                🧹 Limpiar
-                            </button>
-                        </div>
-                        <div id="testLogs" class="bg-black text-green-400 p-3 rounded font-mono text-xs overflow-y-auto flex-1" style="min-height: 300px;">
-                            <div class="text-gray-500">🧪 Logs de testing aparecerán aquí...</div>
-                        </div>
+            <div class="typing-indicator" id="typingIndicator">
+                <div class="typing-bubble">
+                    <div class="typing-dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
                     </div>
                 </div>
             </div>
 
-            <!-- Metrics Tab Content -->
-            <div id="metricsContent" class="tab-content hidden">
-                <div class="p-4 space-y-4" style="height: 400px; overflow-y: auto;">
-                    <!-- Real-time Metrics Cards -->
-                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div class="bg-blue-50 p-3 rounded-lg text-center">
-                            <div id="totalTests" class="text-2xl font-bold text-blue-600">0</div>
-                            <div class="text-xs text-blue-500">Tests Ejecutados</div>
-                        </div>
-                        <div class="bg-green-50 p-3 rounded-lg text-center">
-                            <div id="successRate" class="text-2xl font-bold text-green-600">0%</div>
-                            <div class="text-xs text-green-500">Tasa de Éxito</div>
-                        </div>
-                        <div class="bg-purple-50 p-3 rounded-lg text-center">
-                            <div id="avgResponseTime" class="text-2xl font-bold text-purple-600">0ms</div>
-                            <div class="text-xs text-purple-500">Tiempo Promedio</div>
-                        </div>
-                        <div class="bg-orange-50 p-3 rounded-lg text-center">
-                            <div id="concurrentActive" class="text-2xl font-bold text-orange-600">0</div>
-                            <div class="text-xs text-orange-500">Usuarios Activos</div>
-                        </div>
-                    </div>
-
-                    <!-- Test Results History -->
-                    <div class="bg-gray-50 p-3 rounded-lg">
-                        <h4 class="font-medium text-sm text-gray-700 mb-2">📈 Historial de Resultados</h4>
-                        <div id="testHistory" class="space-y-2 max-h-48 overflow-y-auto">
-                            <div class="text-xs text-gray-500">No hay resultados aún...</div>
-                        </div>
-                    </div>
+            <div class="chat-input">
+                <div class="input-group">
+                    <input type="text" class="phone-input" id="phoneInput" placeholder="56999888777" value="56999888777">
+                    <input type="text" class="message-input" id="messageInput" placeholder="Escribe tu mensaje aquí..." autocomplete="off">
                 </div>
-            </div>
-        </div>
-
-        <!-- Chat Input -->
-        <div class="bg-white rounded-b-lg border-x border-b border-gray-200 p-4">
-            <div class="flex gap-2">
-                <input type="text" id="messageInput" placeholder="Escribe un mensaje (ej: hola)" 
-                       class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <button id="sendBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold transition-colors">
-                    Enviar
+                <button class="send-btn" id="sendBtn" onclick="sendMessage()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                    </svg>
                 </button>
-            </div>
-            
-            <!-- Testing Buttons -->
-            <div class="mt-4 space-x-2" id="testButtons">
-                <!-- Buttons will be added dynamically -->
             </div>
         </div>
     </div>
 
-    <!-- TypeScript will be compiled to JavaScript -->
-    <script src="/js/chat-demo.js"></script>
+    <script>
+        let currentVersion = 'v1';
+        let messageCount = 0;
+        let responseTimes = [];
+        let cacheHits = 0;
+
+        // Inicializar
+        document.addEventListener('DOMContentLoaded', function() {
+            // Enfocar input al cargar
+            document.getElementById('messageInput').focus();
+            
+            // Enter para enviar
+            document.getElementById('messageInput').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendMessage();
+                }
+            });
+
+            // Cambio de versión
+            document.querySelectorAll('.version-btn[data-version]').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    switchVersion(this.dataset.version);
+                });
+            });
+
+            // Actualizar métricas solo cuando sea necesario (no automáticamente)
+            // setInterval(updateMetrics, 5000); // Desactivado para evitar sobrecarga
+        });
+
+        async function switchVersion(version) {
+            try {
+                currentVersion = version;
+                
+                // Actualizar UI
+                document.querySelectorAll('.version-btn[data-version]').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.version === version);
+                });
+
+                // Llamar al endpoint de cambio
+                const response = await fetch('/chat/version/switch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ version })
+                });
+
+                const result = await response.json();
+                
+                if (result.success) {
+                    addSystemMessage(`🔄 Sistema cambiado a ${version.toUpperCase()}`, version);
+                    document.getElementById('activeVersion').textContent = version.toUpperCase();
+                    
+                    // Actualizar badge de arquitectura
+                    const badge = document.getElementById('architectureBadge');
+                    badge.textContent = version === 'v2' ? 'Repository + Cache' : 'Legacy Service';
+                } else {
+                    addSystemMessage(`❌ Error cambiando versión: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                addSystemMessage(`❌ Error de conexión: ${error.message}`, 'error');
+            }
+        }
+
+        async function sendMessage() {
+            const messageInput = document.getElementById('messageInput');
+            const phoneInput = document.getElementById('phoneInput');
+            const sendBtn = document.getElementById('sendBtn');
+            
+            const message = messageInput.value.trim();
+            const phone = phoneInput.value.trim();
+
+            if (!message || !phone) {
+                alert('Por favor ingresa teléfono y mensaje');
+                return;
+            }
+
+            // Deshabilitar input
+            sendBtn.disabled = true;
+            messageInput.disabled = true;
+
+            // Agregar mensaje del usuario
+            addMessage(message, 'user', phone);
+            messageInput.value = '';
+
+            // Mostrar indicador de escritura
+            showTyping();
+
+            const startTime = Date.now();
+
+            try {
+                // Elegir endpoint según versión
+                const endpoint = currentVersion === 'v2' ? '/chat/v2/analytics' : '/test-chat';
+                const body = currentVersion === 'v2' 
+                    ? { userId: phone, message }
+                    : { phone, message };
+
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+
+                const result = await response.json();
+                const responseTime = Date.now() - startTime;
+
+                // Procesar respuesta
+                let botResponse;
+                let analytics = null;
+
+                if (currentVersion === 'v2') {
+                    botResponse = result.conversation?.bot_response || result.response || 'Sin respuesta';
+                    analytics = result.analytics;
+                    if (analytics?.cacheHit) cacheHits++;
+                } else {
+                    botResponse = result.conversation?.bot_response || 'Sin respuesta';
+                }
+
+                // Agregar respuesta del bot
+                hideTyping();
+                addMessage(botResponse, 'bot', null, { 
+                    version: currentVersion, 
+                    responseTime, 
+                    analytics 
+                });
+
+                // Actualizar métricas
+                messageCount++;
+                responseTimes.push(responseTime);
+                updateLocalMetrics();
+
+            } catch (error) {
+                hideTyping();
+                addMessage(`❌ Error: ${error.message}`, 'bot', null, { 
+                    version: 'error', 
+                    responseTime: Date.now() - startTime 
+                });
+            } finally {
+                // Rehabilitar input
+                sendBtn.disabled = false;
+                messageInput.disabled = false;
+                messageInput.focus();
+            }
+        }
+
+        function addMessage(text, sender, phone = null, metadata = {}) {
+            const messagesContainer = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+
+            const bubble = document.createElement('div');
+            bubble.className = 'message-bubble';
+            bubble.innerHTML = text;
+
+            messageDiv.appendChild(bubble);
+
+            // Agregar información adicional
+            if (metadata.version || metadata.responseTime) {
+                const info = document.createElement('div');
+                info.className = 'message-info';
+                
+                const timestamp = new Date().toLocaleTimeString();
+                let infoHtml = `<span>${timestamp}</span>`;
+                
+                if (metadata.version) {
+                    infoHtml += `<span class="version-badge">${metadata.version.toUpperCase()}</span>`;
+                }
+                
+                if (metadata.responseTime) {
+                    infoHtml += `<span class="processing-time">${metadata.responseTime}ms</span>`;
+                }
+
+                info.innerHTML = infoHtml;
+                messageDiv.appendChild(info);
+            }
+
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function addSystemMessage(text, type = 'info') {
+            const messagesContainer = document.getElementById('chatMessages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = 'message bot';
+            messageDiv.style.opacity = '0.8';
+
+            const bubble = document.createElement('div');
+            bubble.className = 'message-bubble';
+            bubble.style.background = type === 'error' ? '#ffe6e6' : '#e3f2fd';
+            bubble.style.borderLeft = `4px solid ${type === 'error' ? '#dc3545' : '#2196f3'}`;
+            bubble.innerHTML = `<strong>Sistema:</strong> ${text}`;
+
+            messageDiv.appendChild(bubble);
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function showTyping() {
+            document.getElementById('typingIndicator').classList.add('show');
+            const messagesContainer = document.getElementById('chatMessages');
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+
+        function hideTyping() {
+            document.getElementById('typingIndicator').classList.remove('show');
+        }
+
+        function updateLocalMetrics() {
+            document.getElementById('messageCount').textContent = messageCount;
+            
+            if (responseTimes.length > 0) {
+                const avgTime = Math.round(responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length);
+                document.getElementById('avgResponseTime').textContent = `${avgTime}ms`;
+            }
+
+            if (messageCount > 0) {
+                const hitRate = Math.round((cacheHits / messageCount) * 100);
+                document.getElementById('cacheHitRate').textContent = `${hitRate}%`;
+            }
+        }
+
+        async function updateMetrics() {
+            try {
+                const response = await fetch('/chat/v2/metrics');
+                if (response.ok) {
+                    const data = await response.json();
+                    // Aquí podrías actualizar métricas del servidor si están disponibles
+                }
+            } catch (error) {
+                // Silenciar errores de métricas
+            }
+        }
+
+        function clearChat() {
+            document.getElementById('chatMessages').innerHTML = '';
+            messageCount = 0;
+            responseTimes = [];
+            cacheHits = 0;
+            updateLocalMetrics();
+            
+            // Restaurar mensaje de bienvenida
+            addMessage(
+                '¡Chat limpiado! 🧹<br>Listo para nuevas conversaciones.',
+                'bot', 
+                null, 
+                { version: 'system' }
+            );
+        }
+
+        async function clearCache() {
+            try {
+                const response = await fetch('/chat/cache/clear', { method: 'POST' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    addSystemMessage(`✅ ${result.message}`, 'success');
+                } else {
+                    addSystemMessage(`❌ Error limpiando cache`, 'error');
+                }
+            } catch (error) {
+                addSystemMessage(`❌ Error: ${error.message}`, 'error');
+            }
+        }
+
+        function sendQuickTest(message) {
+            document.getElementById('messageInput').value = message;
+            sendMessage();
+        }
+    </script>
 </body>
 </html>
