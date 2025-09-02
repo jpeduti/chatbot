@@ -28,6 +28,7 @@ export interface UsuarioState {
     telefono?: string | null
     telefono_detectado?: string
     telefono_confirmado?: boolean
+    preferencia_contacto?: string
     whatsapp?: string
     edad?: number
     region?: string
@@ -156,20 +157,26 @@ Ejemplo: +56912345678 o 912345678
       }
       
       case '3': {
-        // 🚫 Usuario prefiere continuar sin guardar número
+        // 🚫 Usuario prefiere continuar sin confirmar número explícitamente
+        // 💡 NUEVO: Guardamos el número pero marcamos que no fue confirmado por el usuario
         this.setUsuarioState(userId, {
           datos_prospecto: {
             ...state.datos_prospecto,
-            telefono: null,
-            telefono_confirmado: false
+            telefono: userId, // ✅ Guardamos el número real (para contacto si es necesario)
+            telefono_confirmado: false, // ❌ Usuario no lo confirmó explícitamente  
+            preferencia_contacto: 'sin_telefono_explicito' // 🏷️ Marca de preferencia
           },
           paso_actual: 'solicitar_nombre'
         })
         
-        // 📊 LOG: Usuario optó por no usar teléfono
-        logger.logProspectData(userId, 'telefono_rechazado', { reason: 'usuario_eligio_privacidad' }, true)
+        // 📊 LOG: Usuario optó por privacidad pero guardamos número para análisis
+        logger.logProspectData(userId, 'telefono_no_confirmado', { 
+          reason: 'usuario_eligio_privacidad',
+          numero_guardado: userId,
+          preferencia: 'sin_telefono_explicito'
+        }, true)
         
-        return `✅ **Entendido.** Continuaremos sin guardar tu número.
+        return `✅ **Entendido.** Continuaremos sin confirmar tu número.
 
 🎓 Para brindarte información sobre UNIACC:
 
@@ -233,6 +240,46 @@ Escribe **solo el número** de tu opción (1, 2 o 3)`
     } catch (error: any) {
       console.error(`💥 Error crítico creando prospecto con teléfono:`, error.message)
     }
+  }
+
+  /**
+   * ✅ Finalizar captura SIN teléfono cuando usuario eligió privacidad
+   */
+  private async finalizarCapturaSinTelefono(userId: string, regionSeleccionada: string): Promise<string> {
+    const state = this.getUsuarioState(userId)
+    const datos = state.datos_prospecto
+    
+    // 📊 LOG: Finalizando SIN teléfono por preferencia del usuario
+    logger.logProspectData(userId, 'captura_completa_sin_telefono_explicito', datos, true)
+    
+    // Completar captura en base de datos (sin teléfono confirmado)
+    const resultado = await this.finalizarCapturaDatos(userId)
+    
+    return `🎉 **¡PERFECTO ${datos?.nombre?.toUpperCase()}!**
+
+📋 **Tus datos registrados:**
+👤 ${datos?.nombre}
+📧 ${datos?.email}
+🎂 ${datos?.edad} años
+📍 ${regionSeleccionada}
+🔒 Contacto por email (como preferiste)
+
+✅ **Datos guardados exitosamente**
+
+---
+
+🌟 **¡Bienvenid@ a UNIACC!** 🌟
+*Universidad de Artes, Ciencias y Comunicaciones*
+
+¿En qué puedo ayudarte hoy?
+
+1️⃣ **Conocer nuestras carreras**
+2️⃣ **Proceso de admisión 2025**
+3️⃣ **Costos y becas**
+4️⃣ **Modalidades de estudio**
+5️⃣ **Hablar con un asesor**
+
+Escribe el número de tu opción 📝`
   }
 
   /**
@@ -484,6 +531,10 @@ Escribe el número de tu opción 📝`
           paso_actual: 'solicitar_email'
         })
         
+        // 📝 Progressive Capture: Guardar paso nombre
+        const estadoActualizado = this.getUsuarioState(userId)
+        await this.guardarPasoProgressive(userId, 'nombre', mensaje, estadoActualizado)
+        
         // 🆕 PROGRESSIVE CAPTURE: Solo crear si no existe ya un prospecto
         if (!state.prospecto_id) {
           // Solo crear nuevo prospecto si no hay teléfono confirmado
@@ -524,6 +575,10 @@ Escribe el número de tu opción 📝`
           paso_actual: 'solicitar_edad'
         })
         
+        // 📝 Progressive Capture: Guardar paso email
+        const estadoActualizadoEmail = this.getUsuarioState(userId)
+        await this.guardarPasoProgressive(userId, 'email', mensaje, estadoActualizadoEmail)
+        
         // 🆕 PROGRESSIVE CAPTURE: Actualizar email en prospecto existente
         if (state.prospecto_id) {
           await this.actualizarProspectoCampo(state.prospecto_id, 'email', mensaje)
@@ -543,6 +598,20 @@ Escribe el número de tu opción 📝`
           return `❌ Por favor ingresa una edad válida (entre 16 y 80 años)`
         }
         
+        // 📱 Verificar si teléfono ya está confirmado O si usuario eligió privacidad
+        const tienePreferenciaPrivacidad = state.datos_prospecto?.preferencia_contacto === 'sin_telefono_explicito'
+        const telefonoYaConfirmado = state.datos_prospecto?.telefono_confirmado === true
+        const siguientepasoEdad = (telefonoYaConfirmado || tienePreferenciaPrivacidad) ? 'solicitar_region' : 'solicitar_telefono'
+        
+        this.setUsuarioState(userId, {
+          datos_prospecto: { ...state.datos_prospecto, edad },
+          paso_actual: siguientepasoEdad
+        })
+
+        // 📝 Progressive Capture: Guardar paso edad
+        const estadoActualizadoEdad = this.getUsuarioState(userId)
+        await this.guardarPasoProgressive(userId, 'edad', edad, estadoActualizadoEdad)
+        
         // 🆕 PROGRESSIVE CAPTURE: Actualizar edad en prospecto existente
         if (state.prospecto_id) {
           await this.actualizarProspectoCampo(state.prospecto_id, 'edad', edad)
@@ -551,14 +620,6 @@ Escribe el número de tu opción 📝`
             campos_capturados: [...(state.campos_capturados || []), 'edad']
           })
         }
-        
-        // 📱 Verificar si teléfono ya está confirmado
-        const siguientepasoEdad = state.datos_prospecto?.telefono_confirmado ? 'solicitar_region' : 'solicitar_telefono'
-        
-                this.setUsuarioState(userId, {
-          datos_prospecto: { ...state.datos_prospecto, edad },
-          paso_actual: siguientepasoEdad
-        })
         
         if (siguientepasoEdad === 'solicitar_region') {
         return `✅ Edad: ${edad} años
@@ -603,15 +664,23 @@ Escribe el **número** de tu región:`
         
         const regionSeleccionada = regiones[numeroRegion - 1]
         
-        // 📱 Si teléfono ya confirmado, ir directo al menú principal
-        const siguientepasoRegion = state.datos_prospecto?.telefono_confirmado ? null : 'solicitar_telefono'
-        const siguienteFlujo = state.datos_prospecto?.telefono_confirmado ? 'menu_principal' : 'captura_inicial'
+        // 📱 Si teléfono ya confirmado O usuario eligió privacidad, ir directo al menú principal
+        const tienePreferenciaPrivacidadRegion = state.datos_prospecto?.preferencia_contacto === 'sin_telefono_explicito'
+        const telefonoYaConfirmadoRegion = state.datos_prospecto?.telefono_confirmado === true
+        const saltarTelefono = telefonoYaConfirmadoRegion || tienePreferenciaPrivacidadRegion
+        
+        const siguientepasoRegion = saltarTelefono ? null : 'solicitar_telefono'
+        const siguienteFlujo = saltarTelefono ? 'menu_principal' : 'captura_inicial'
         
         this.setUsuarioState(userId, {
           datos_prospecto: { ...state.datos_prospecto, region: regionSeleccionada },
           paso_actual: siguientepasoRegion,
           flujo_actual: siguienteFlujo
         })
+        
+        // 📝 Progressive Capture: Guardar paso región  
+        const estadoActualizadoRegion = this.getUsuarioState(userId)
+        await this.guardarPasoProgressive(userId, 'region', regionSeleccionada, estadoActualizadoRegion)
         
         // 🆕 PROGRESSIVE CAPTURE: Actualizar región en prospecto existente
         if (state.prospecto_id) {
@@ -623,8 +692,12 @@ Escribe el **número** de tu región:`
         }
         
         if (siguientepasoRegion === null) {
-          // Finalizar captura con teléfono ya confirmado
-          return await this.finalizarCapturaConTelefonoConfirmado(userId, regionSeleccionada)
+          // Finalizar captura con teléfono ya confirmado O por preferencia de privacidad
+          if (tienePreferenciaPrivacidadRegion) {
+            return await this.finalizarCapturaSinTelefono(userId, regionSeleccionada)
+          } else {
+            return await this.finalizarCapturaConTelefonoConfirmado(userId, regionSeleccionada)
+          }
         } else {
           return `✅ Región: ${regionSeleccionada}
 
@@ -2213,6 +2286,9 @@ Escribe el número de tu opción 📝`
         tipo_consulta: 'solicitud_asesor', // 🎯 ESTO ES LO IMPORTANTE
         source: 'uniacc_chatbot',
         flujo_actual: 'solicitud_asesor',
+        // 🆕 NUEVOS CAMPOS DE PREFERENCIAS
+        telefono_confirmado: datosCompletos.telefono_confirmado !== undefined ? datosCompletos.telefono_confirmado : true,
+        preferencia_contacto: datosCompletos.preferencia_contacto || 'normal',
         // 🎯 NUEVO: Forzar actualización de prospecto_actual
         datos_adicionales: {
           force_update_actual: true,
@@ -2304,6 +2380,119 @@ Escribe el número de tu opción 📝`
 
   // 💾 MÉTODOS DE CAPTURA INCREMENTAL
 
+  /**
+   * 📝 Progressive Capture: Guardar cada paso individual 
+   */
+  private async guardarPasoProgressive(
+    userId: string, 
+    campo: string, 
+    valor: any, 
+    estado: UsuarioState
+  ): Promise<void> {
+    try {
+      const datos = estado.datos_prospecto || {}
+      
+      // 🏷️ Determinar tipo de consulta específico por paso
+      const tipoConsultaPaso = this.determinarTipoConsultaPorPaso(campo, datos)
+      
+      // 📊 Crear datos incrementales con el nuevo campo
+      const datosIncrementales = { ...datos } as any
+      datosIncrementales[campo] = valor
+      
+      console.log(`📝 [PROGRESSIVE] Guardando paso: ${campo} = ${valor} para ${userId}`)
+      
+      const prospectoData: ProspectoData = {
+        nombre: datosIncrementales.nombre || 'Usuario WhatsApp',
+        email: datosIncrementales.email || undefined,
+        telefono: datosIncrementales.telefono || undefined,
+        whatsapp: userId,
+        edad: datosIncrementales.edad || undefined,
+        region: datosIncrementales.region || undefined,
+        carrera_interes: datosIncrementales.carrera_interes || "Sin especificar",
+        nivel_interes: datosIncrementales.nivel_interes || 'medio',
+        tipo_consulta: tipoConsultaPaso,
+        source: 'uniacc_chatbot',
+        flujo_actual: `paso_${campo}`,
+        // 🆕 Preservar preferencias de contacto
+        telefono_confirmado: datosIncrementales.telefono_confirmado !== undefined ? datosIncrementales.telefono_confirmado : true,
+        preferencia_contacto: datosIncrementales.preferencia_contacto || 'normal',
+        // 🔄 Metadata específica del paso
+        datos_adicionales: {
+          campo_capturado: campo,
+          valor_capturado: valor,
+          paso_numero: this.calcularNumeroPaso(campo),
+          progreso_porcentaje: this.calcularProgreso(datosIncrementales),
+          pasos_completados: this.obtenerPasosCompletados(datosIncrementales)
+        }
+      }
+
+      const resultado = await this.supabaseIntegration.enviarProspecto(prospectoData)
+      
+      if (resultado.success) {
+        console.log(`✅ [PROGRESSIVE] Paso ${campo} guardado: ${resultado.prospectoId}`)
+        
+        // 🔄 Actualizar estado con ID si es el primer paso
+        if (!estado.prospecto_id && resultado.prospectoId) {
+          this.setUsuarioState(userId, {
+            prospecto_id: resultado.prospectoId,
+            fecha_creacion_prospecto: new Date()
+          })
+        }
+      } else {
+        console.error(`❌ [PROGRESSIVE] Error guardando paso ${campo}:`, resultado.error)
+      }
+      
+    } catch (error) {
+      console.error(`💥 [PROGRESSIVE] Error crítico en paso ${campo}:`, error)
+    }
+  }
+
+  /**
+   * 🏷️ Determinar tipo de consulta específico por paso
+   */
+  private determinarTipoConsultaPorPaso(campo: string, datos: any): string {
+    const baseType = 'progressive_capture'
+    
+    switch (campo) {
+      case 'nombre': return `${baseType}_nombre`
+      case 'email': return `${baseType}_email`
+      case 'edad': return `${baseType}_edad`
+      case 'region': return `${baseType}_region`
+      case 'telefono': return `${baseType}_telefono`
+      default: return `${baseType}_${campo}`
+    }
+  }
+
+  /**
+   * 📊 Calcular número de paso
+   */
+  private calcularNumeroPaso(campo: string): number {
+    const pasos = ['nombre', 'email', 'edad', 'region', 'telefono']
+    return pasos.indexOf(campo) + 1
+  }
+
+  /**
+   * 📈 Calcular progreso porcentual
+   */
+  private calcularProgreso(datos: any): number {
+    const camposObligatorios = ['nombre', 'email', 'edad', 'region']
+    const camposCompletos = camposObligatorios.filter(campo => datos[campo] != null).length
+    return Math.round((camposCompletos / camposObligatorios.length) * 100)
+  }
+
+  /**
+   * ✅ Obtener lista de pasos completados
+   */
+  private obtenerPasosCompletados(datos: any): string[] {
+    const pasos = []
+    if (datos.nombre) pasos.push('nombre')
+    if (datos.email) pasos.push('email')
+    if (datos.edad) pasos.push('edad')
+    if (datos.region) pasos.push('region')
+    if (datos.telefono && datos.telefono_confirmado) pasos.push('telefono')
+    return pasos
+  }
+
   // Crear prospecto inicial con datos disponibles
   private async crearProspectoInicial(userId: string, datosCompletos?: any): Promise<string | null> {
     try {
@@ -2343,7 +2532,10 @@ Escribe el número de tu opción 📝`
         nivel_interes: datos?.nivel_interes || 'medio',
         tipo_consulta: this.determinarTipoConsulta(datos), // Determinar dinámicamente
         source: 'uniacc_chatbot',
-        flujo_actual: 'captura_inicial'
+        flujo_actual: 'captura_inicial',
+        // 🆕 NUEVOS CAMPOS DE PREFERENCIAS
+        telefono_confirmado: datos?.telefono_confirmado !== undefined ? datos.telefono_confirmado : true,
+        preferencia_contacto: datos?.preferencia_contacto || 'normal'
       }
 
       console.log(`💾 Creando prospecto inicial para ${userId}: ${datos?.nombre || 'Usuario WhatsApp'}`)

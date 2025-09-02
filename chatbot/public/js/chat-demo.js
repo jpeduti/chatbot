@@ -16,7 +16,7 @@ class UNIACCChatDemo {
         this.isTestingMode = false;
         // Flow Test Definitions
         this.flowTestCases = new Map();
-        this.currentPhone = '56912345809';
+        this.currentPhone = '56999888777'; // 🔄 Test hot reload
         this.initializeElements();
         this.setupEventListeners();
         this.setupTabs();

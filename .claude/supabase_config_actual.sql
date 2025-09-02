@@ -276,12 +276,18 @@ create table prospecto_actual
     notas                 text,
     tags                  text[],
     created_at            timestamp with time zone default now(),
-    updated_at            timestamp with time zone default now()
+    updated_at            timestamp with time zone default now(),
+    telefono_confirmado   boolean                  default true,
+    preferencia_contacto  text                     default 'normal'::text
 );
 
 comment on table prospecto_actual is 'Estado actual de cada prospecto. Optimizada para consultas frecuentes del dashboard. 1 registro por WhatsApp.';
 
 comment on constraint prospecto_actual_estado_check on prospecto_actual is 'Estados permitidos incluyendo recurrente y frecuente para análisis de comportamiento';
+
+comment on column prospecto_actual.telefono_confirmado is 'Indica si el usuario confirmó explícitamente su número de teléfono';
+
+comment on column prospecto_actual.preferencia_contacto is 'Preferencia de contacto del usuario: normal, sin_telefono_explicito, solo_email, etc.';
 
 alter table prospecto_actual
     owner to postgres;
@@ -422,6 +428,10 @@ create index idx_actual_utm
     on prospecto_actual (utm_source, utm_campaign)
     where (utm_source IS NOT NULL);
 
+create index idx_actual_preferencia_contacto
+    on prospecto_actual (preferencia_contacto, telefono_confirmado)
+    where (preferencia_contacto <> 'normal'::text);
+
 create table prospecto_historial
 (
     id                      uuid                     default gen_random_uuid() not null
@@ -459,10 +469,16 @@ create table prospecto_historial
             WHEN ((tipo_consulta !~~ 'abandono%'::text) AND (sesion_numero > 1)) THEN 'reconversion'::text
             ELSE 'exploracion'::text
             END) stored,
+    telefono_confirmado     boolean                  default true,
+    preferencia_contacto    text                     default 'normal'::text,
     unique (whatsapp, sesion_numero)
 );
 
 comment on table prospecto_historial is 'Historial completo de todas las sesiones. Optimizada para analytics y reporting. Múltiples registros por WhatsApp.';
+
+comment on column prospecto_historial.telefono_confirmado is 'Indica si el usuario confirmó explícitamente su número en esta sesión';
+
+comment on column prospecto_historial.preferencia_contacto is 'Preferencia de contacto del usuario en esta sesión específica';
 
 alter table prospecto_historial
     owner to postgres;
@@ -568,6 +584,35 @@ HAVING count(DISTINCT whatsapp) >= 2
 ORDER BY (count(DISTINCT whatsapp)) DESC;
 
 alter table metricas_carreras
+    owner to postgres;
+
+create view prospectos_privacidad
+            (whatsapp, nombre, email, telefono, telefono_confirmado, preferencia_contacto, nivel_interes,
+             total_sesiones, ultima_interaccion, nota_privacidad)
+as
+SELECT whatsapp,
+       nombre,
+       email,
+       telefono,
+       telefono_confirmado,
+       preferencia_contacto,
+       nivel_interes,
+       total_sesiones,
+       ultima_interaccion,
+       CASE
+           WHEN telefono_confirmado = false THEN 'Número no confirmado por usuario'::text
+           WHEN preferencia_contacto = 'sin_telefono_explicito'::text THEN 'Usuario prefiere no compartir teléfono'::text
+           WHEN preferencia_contacto = 'solo_email'::text THEN 'Usuario prefiere contacto solo por email'::text
+           ELSE 'Contacto normal'::text
+           END AS nota_privacidad
+FROM prospecto_actual
+WHERE telefono_confirmado = false
+   OR preferencia_contacto <> 'normal'::text
+ORDER BY ultima_interaccion DESC;
+
+comment on view prospectos_privacidad is 'Vista de prospectos con preferencias especiales de privacidad para el equipo de ventas';
+
+alter table prospectos_privacidad
     owner to postgres;
 
 create function update_updated_at_column() returns trigger
@@ -834,141 +879,6 @@ $$;
 
 alter function sync_prospecto_actual() owner to postgres;
 
-create function insertar_sesion_prospecto(p_whatsapp text, p_nombre text, p_email text DEFAULT NULL::text, p_telefono text DEFAULT NULL::text, p_edad integer DEFAULT NULL::integer, p_region text DEFAULT NULL::text, p_carrera_interes text DEFAULT 'Sin especificar'::text, p_facultad_interes text DEFAULT ''::text, p_tipo_consulta text DEFAULT 'consulta_general'::text, p_nivel_interes text DEFAULT 'medio'::text, p_fuente text DEFAULT 'uniacc_chatbot'::text, p_datos_capturados jsonb DEFAULT '{}'::jsonb, p_duracion_sesion interval DEFAULT NULL::interval, p_mensajes integer DEFAULT 0, p_flujo_completado boolean DEFAULT false, p_razon_finalizacion text DEFAULT 'completado'::text, p_paso_abandono text DEFAULT NULL::text, p_metadata jsonb DEFAULT '{}'::jsonb)
-    returns TABLE(historial_id uuid, sesion_numero integer, es_nuevo_usuario boolean, perfil_usuario text)
-    language plpgsql
-as
-$$
-DECLARE
-  nuevo_sesion_numero INTEGER;
-  new_historial_id UUID;
-  es_nuevo BOOLEAN;
-  perfil TEXT;
-BEGIN
-  -- Verificar si es usuario nuevo
-  SELECT COUNT(*) = 0 INTO es_nuevo
-  FROM prospecto_historial
-  WHERE whatsapp = p_whatsapp;
-
-  -- Obtener siguiente número de sesión
-  SELECT COALESCE(MAX(h.sesion_numero), 0) + 1
-  INTO nuevo_sesion_numero
-  FROM prospecto_historial h
-  WHERE h.whatsapp = p_whatsapp;
-
-  -- Determinar perfil del usuario
-  perfil := CASE
-    WHEN es_nuevo THEN 'nuevo'
-    WHEN nuevo_sesion_numero = 2 THEN 'recurrente_temprano'
-    WHEN nuevo_sesion_numero <= 5 THEN 'recurrente_medio'
-    ELSE 'recurrente_avanzado'
-  END;
-
-  -- 1️⃣ INSERTAR EN HISTORIAL (como antes)
-  INSERT INTO prospecto_historial (
-    whatsapp,
-    nombre,
-    email,
-    telefono,
-    edad,
-    region,
-    carrera_interes,
-    facultad_interes,
-    tipo_consulta,
-    nivel_interes,
-    fuente,
-    datos_capturados,
-    sesion_numero,
-    duracion_sesion,
-    mensajes_intercambiados,
-    flujo_completado,
-    razon_finalizacion,
-    paso_abandono,
-    metadata
-  ) VALUES (
-    p_whatsapp,
-    p_nombre,
-    p_email,
-    p_telefono,
-    p_edad,
-    p_region,
-    p_carrera_interes,
-    p_facultad_interes,
-    p_tipo_consulta,
-    p_nivel_interes,
-    p_fuente,
-    p_datos_capturados,
-    nuevo_sesion_numero,
-    p_duracion_sesion,
-    p_mensajes,
-    p_flujo_completado,
-    p_razon_finalizacion,
-    p_paso_abandono,
-    p_metadata
-  ) RETURNING id INTO new_historial_id;
-
-  -- 2️⃣ UPSERT EN PROSPECTO_ACTUAL (manual, sin trigger)
-  INSERT INTO prospecto_actual (
-    whatsapp,
-    nombre,
-    email,
-    telefono,
-    edad,
-    region,
-    carrera_interes,
-    facultad_interes,
-    nivel_interes,
-    estado,
-    tipo_consulta_actual,
-    total_sesiones,
-    ultima_interaccion,
-    fuente,
-    metadata
-  ) VALUES (
-    p_whatsapp,
-    p_nombre,
-    p_email,
-    p_telefono,
-    p_edad,
-    p_region,
-    p_carrera_interes,
-    p_facultad_interes,
-    p_nivel_interes,
-    CASE WHEN es_nuevo THEN 'nuevo' ELSE 'recurrente' END,
-    p_tipo_consulta,
-    nuevo_sesion_numero,
-    NOW(),
-    p_fuente,
-    p_metadata
-  )
-  ON CONFLICT (whatsapp) DO UPDATE SET
-    nombre = EXCLUDED.nombre,
-    email = COALESCE(EXCLUDED.email, prospecto_actual.email),
-    telefono = COALESCE(EXCLUDED.telefono, prospecto_actual.telefono),
-    edad = COALESCE(EXCLUDED.edad, prospecto_actual.edad),
-    region = COALESCE(EXCLUDED.region, prospecto_actual.region),
-    carrera_interes = EXCLUDED.carrera_interes,
-    facultad_interes = EXCLUDED.facultad_interes,
-    nivel_interes = EXCLUDED.nivel_interes,
-    estado = CASE
-      WHEN EXCLUDED.total_sesiones = 1 THEN 'nuevo'
-      WHEN EXCLUDED.total_sesiones <= 3 THEN 'recurrente'
-      ELSE 'frecuente'
-    END,
-    tipo_consulta_actual = EXCLUDED.tipo_consulta_actual,
-    total_sesiones = EXCLUDED.total_sesiones,
-    ultima_interaccion = NOW(),
-    metadata = EXCLUDED.metadata,
-    updated_at = NOW();
-
-  RETURN QUERY SELECT new_historial_id, nuevo_sesion_numero, es_nuevo, perfil;
-END;
-$$;
-
-comment on function insertar_sesion_prospecto(text, text, text, text, integer, text, text, text, text, text, text, jsonb, interval, integer, boolean, text, text, jsonb) is 'Función híbrida: inserta en historial + mantiene prospecto_actual actualizado. Sin triggers externos.';
-
-alter function insertar_sesion_prospecto(text, text, text, text, integer, text, text, text, text, text, text, jsonb, interval, integer, boolean, text, text, jsonb) owner to postgres;
-
 create function sync_conversacion_prospecto() returns trigger
     language plpgsql
 as
@@ -1004,4 +914,158 @@ create trigger trigger_sync_conversacion_prospecto
     on conversaciones
     for each row
 execute procedure sync_conversacion_prospecto();
+
+create function insertar_sesion_prospecto(p_whatsapp text, p_nombre text, p_email text DEFAULT NULL::text, p_telefono text DEFAULT NULL::text, p_edad integer DEFAULT NULL::integer, p_region text DEFAULT NULL::text, p_carrera_interes text DEFAULT 'Sin especificar'::text, p_facultad_interes text DEFAULT ''::text, p_tipo_consulta text DEFAULT 'consulta_general'::text, p_nivel_interes text DEFAULT 'medio'::text, p_fuente text DEFAULT 'uniacc_chatbot'::text, p_datos_capturados jsonb DEFAULT '{}'::jsonb, p_duracion_sesion interval DEFAULT NULL::interval, p_mensajes integer DEFAULT 0, p_flujo_completado boolean DEFAULT false, p_razon_finalizacion text DEFAULT 'completado'::text, p_paso_abandono text DEFAULT NULL::text, p_metadata jsonb DEFAULT '{}'::jsonb, p_telefono_confirmado boolean DEFAULT true, p_preferencia_contacto text DEFAULT 'normal'::text)
+    returns TABLE(historial_id uuid, sesion_numero integer, es_nuevo_usuario boolean, perfil_usuario text)
+    language plpgsql
+as
+$$
+DECLARE
+  nuevo_sesion_numero INTEGER;
+  new_historial_id UUID;
+  es_nuevo BOOLEAN;
+  perfil TEXT;
+BEGIN
+  -- Verificar si es usuario nuevo
+  SELECT COUNT(*) = 0 INTO es_nuevo
+  FROM prospecto_historial
+  WHERE whatsapp = p_whatsapp;
+
+  -- Obtener siguiente número de sesión
+  SELECT COALESCE(MAX(h.sesion_numero), 0) + 1
+  INTO nuevo_sesion_numero
+  FROM prospecto_historial h
+  WHERE h.whatsapp = p_whatsapp;
+
+  -- Determinar perfil del usuario
+  perfil := CASE
+    WHEN es_nuevo THEN 'nuevo'
+    WHEN nuevo_sesion_numero = 2 THEN 'recurrente_temprano'
+    WHEN nuevo_sesion_numero <= 5 THEN 'recurrente_medio'
+    ELSE 'recurrente_avanzado'
+  END;
+
+  -- 1️⃣ INSERTAR EN HISTORIAL (con nuevos campos)
+  INSERT INTO prospecto_historial (
+    whatsapp,
+    nombre,
+    email,
+    telefono,
+    edad,
+    region,
+    carrera_interes,
+    facultad_interes,
+    tipo_consulta,
+    nivel_interes,
+    fuente,
+    datos_capturados,
+    sesion_numero,
+    duracion_sesion,
+    mensajes_intercambiados,
+    flujo_completado,
+    razon_finalizacion,
+    paso_abandono,
+    metadata,
+    telefono_confirmado,
+    preferencia_contacto
+  ) VALUES (
+    p_whatsapp,
+    p_nombre,
+    p_email,
+    p_telefono,
+    p_edad,
+    p_region,
+    p_carrera_interes,
+    p_facultad_interes,
+    p_tipo_consulta,
+    p_nivel_interes,
+    p_fuente,
+    p_datos_capturados,
+    nuevo_sesion_numero,
+    p_duracion_sesion,
+    p_mensajes,
+    p_flujo_completado,
+    p_razon_finalizacion,
+    p_paso_abandono,
+    p_metadata,
+    p_telefono_confirmado,
+    p_preferencia_contacto
+  ) RETURNING id INTO new_historial_id;
+
+  -- 2️⃣ UPSERT EN PROSPECTO_ACTUAL (con nuevos campos)
+  INSERT INTO prospecto_actual (
+    whatsapp,
+    nombre,
+    email,
+    telefono,
+    edad,
+    region,
+    carrera_interes,
+    facultad_interes,
+    nivel_interes,
+    estado,
+    tipo_consulta_actual,
+    total_sesiones,
+    ultima_interaccion,
+    fuente,
+    metadata,
+    telefono_confirmado,
+    preferencia_contacto
+  ) VALUES (
+    p_whatsapp,
+    p_nombre,
+    p_email,
+    p_telefono,
+    p_edad,
+    p_region,
+    p_carrera_interes,
+    p_facultad_interes,
+    p_nivel_interes,
+    CASE WHEN es_nuevo THEN 'nuevo' ELSE 'recurrente' END,
+    p_tipo_consulta,
+    nuevo_sesion_numero,
+    NOW(),
+    p_fuente,
+    p_metadata,
+    p_telefono_confirmado,
+    p_preferencia_contacto
+  )
+  ON CONFLICT (whatsapp) DO UPDATE SET
+    nombre = EXCLUDED.nombre,
+    email = COALESCE(EXCLUDED.email, prospecto_actual.email),
+    telefono = COALESCE(EXCLUDED.telefono, prospecto_actual.telefono),
+    edad = COALESCE(EXCLUDED.edad, prospecto_actual.edad),
+    region = COALESCE(EXCLUDED.region, prospecto_actual.region),
+    carrera_interes = EXCLUDED.carrera_interes,
+    facultad_interes = EXCLUDED.facultad_interes,
+    nivel_interes = EXCLUDED.nivel_interes,
+    estado = CASE
+      WHEN EXCLUDED.total_sesiones = 1 THEN 'nuevo'
+      WHEN EXCLUDED.total_sesiones <= 3 THEN 'recurrente'
+      ELSE 'frecuente'
+    END,
+    tipo_consulta_actual = EXCLUDED.tipo_consulta_actual,
+    total_sesiones = EXCLUDED.total_sesiones,
+    ultima_interaccion = NOW(),
+    metadata = EXCLUDED.metadata,
+    -- 🆕 ACTUALIZAR NUEVOS CAMPOS
+    telefono_confirmado = CASE
+      -- Si es la sesión más reciente, usar el nuevo valor
+      WHEN EXCLUDED.total_sesiones >= prospecto_actual.total_sesiones THEN EXCLUDED.telefono_confirmado
+      -- Si no, mantener el existente solo si es TRUE (preservar FALSE)
+      ELSE CASE WHEN prospecto_actual.telefono_confirmado = FALSE THEN FALSE ELSE EXCLUDED.telefono_confirmado END
+    END,
+    preferencia_contacto = CASE
+      WHEN EXCLUDED.total_sesiones >= prospecto_actual.total_sesiones THEN EXCLUDED.preferencia_contacto
+      ELSE prospecto_actual.preferencia_contacto
+    END,
+    updated_at = NOW();
+
+  RETURN QUERY SELECT new_historial_id, nuevo_sesion_numero, es_nuevo, perfil;
+END;
+$$;
+
+comment on function insertar_sesion_prospecto(text, text, text, text, integer, text, text, text, text, text, text, jsonb, interval, integer, boolean, text, text, jsonb, boolean, text) is 'Función híbrida actualizada: inserta en historial + mantiene prospecto_actual con preferencias de contacto';
+
+alter function insertar_sesion_prospecto(text, text, text, text, integer, text, text, text, text, text, text, jsonb, interval, integer, boolean, text, text, jsonb, boolean, text) owner to postgres;
 

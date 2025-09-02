@@ -18,6 +18,9 @@ export interface ProspectoData {
   utm_medium?: string
   utm_campaign?: string
   datos_adicionales?: Record<string, any>
+  // 🆕 Nuevos campos para preferencias de contacto
+  telefono_confirmado?: boolean
+  preferencia_contacto?: string
 }
 
 export class SupabaseIntegration {
@@ -70,7 +73,10 @@ export class SupabaseIntegration {
           bot_source: 'uniacc_direct',
         timestamp: new Date().toISOString(),
           ...data.datos_adicionales
-        })
+        }),
+        // 🆕 NUEVOS PARÁMETROS PARA PREFERENCIAS DE CONTACTO
+        p_telefono_confirmado: data.telefono_confirmado !== undefined ? data.telefono_confirmado : true,
+        p_preferencia_contacto: data.preferencia_contacto || 'normal'
       }
 
       console.log('🔧 DEBUG - Payload para función BD:', JSON.stringify(payload, null, 2))
