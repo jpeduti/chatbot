@@ -40,3 +40,19 @@ WARNING_TIMEOUT=10000  # Tiempo antes de mostrar advertencia (10 segundos para p
 
 # Chat Demo Configuration
 CURRENT_PHONE=56912345809  # Número de teléfono para testing del chat demo
+
+# 🚀 PRISMA DATABASE CONFIGURATION
+# Configuración de Prisma para conectar con Supabase PostgreSQL
+
+# 📊 DATABASE_URL - Session Pooler (para operaciones normales con Prisma)
+DATABASE_URL="postgresql://postgres:Perrobotill0@db.vtwdmyezyvhprwonengu.supabase.co:5432/postgres"
+
+# 🔗 DIRECT_URL - Direct Connection (para migraciones e introspection)
+DIRECT_URL="postgresql://postgres.vtwdmyezyvhprwonengu:Perrobotill0@aws-1-us-east-2.pooler.supabase.com:5432/postgres"
+
+# 📋 INSTRUCCIONES PARA CONFIGURAR:
+# 1. Ve a https://supabase.com/dashboard/project/vtwdmyezyvhprwonengu/settings/database
+# 2. Copia la "Session mode" connection string en DATABASE_URL
+# 3. Copia la "Direct connection" string en DIRECT_URL  
+# 4. Reemplaza [TU_PASSWORD] con la contraseña real de tu base de datos
+# 5. ¡Guarda y ya estará listo para Prisma!

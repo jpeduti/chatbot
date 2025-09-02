@@ -187,15 +187,15 @@ app.post('/api/prospectos', async (req, res) => {
     }
 
     const { 
-      nombre, 
-      email, 
-      telefono, 
-      whatsapp, 
-      edad, 
-      region, 
+          nombre,
+          email,
+          telefono,
+          whatsapp,
+          edad,
+          region,
       source, 
-      carrera_interes, 
-      facultad_interes,
+          carrera_interes,
+          facultad_interes,
       tipo_consulta,  // 🆕 Progressive Capture
       nivel_interes,
       prospecto_id  // 🆕 Para actualizaciones existentes
@@ -237,8 +237,8 @@ app.post('/api/prospectos', async (req, res) => {
           .from('prospectos')
           .update(updateData)
           .eq('id', prospecto_id)
-          .select('id')
-          .single()
+        .select('id')
+        .single()
 
       if (error) throw error
         result = data

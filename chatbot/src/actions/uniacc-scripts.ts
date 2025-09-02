@@ -696,7 +696,7 @@ Escribe el **número** de tu región:`
           if (tienePreferenciaPrivacidadRegion) {
             return await this.finalizarCapturaSinTelefono(userId, regionSeleccionada)
           } else {
-            return await this.finalizarCapturaConTelefonoConfirmado(userId, regionSeleccionada)
+          return await this.finalizarCapturaConTelefonoConfirmado(userId, regionSeleccionada)
           }
         } else {
           return `✅ Región: ${regionSeleccionada}

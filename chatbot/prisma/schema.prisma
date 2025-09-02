@@ -1,0 +1,345 @@
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../src/generated/prisma"
+  previewFeatures = ["relationJoins", "views"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model automatizacion_ejecuciones {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at        DateTime?         @default(now()) @db.Timestamptz(6)
+  automatizacion_id String?           @db.Uuid
+  prospecto_id      String?           @db.Uuid
+  estado            String?           @default("pendiente")
+  trigger_data      Json?             @default("{}")
+  resultado         Json?             @default("{}")
+  error_message     String?
+  iniciado_at       DateTime?         @db.Timestamptz(6)
+  completado_at     DateTime?         @db.Timestamptz(6)
+  metadata          Json?             @default("{}")
+  automatizaciones  automatizaciones? @relation(fields: [automatizacion_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([automatizacion_id], map: "idx_ejecuciones_automatizacion")
+  @@index([estado], map: "idx_ejecuciones_estado")
+  @@index([prospecto_id], map: "idx_ejecuciones_prospecto")
+}
+
+model automatizaciones {
+  id                         String                       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at                 DateTime?                    @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime?                    @default(now()) @db.Timestamptz(6)
+  nombre                     String
+  descripcion                String?
+  activa                     Boolean?                     @default(true)
+  trigger_config             Json
+  actions_config             Json
+  condiciones                Json?                        @default("{}")
+  total_ejecutado            Int?                         @default(0)
+  total_exitoso              Int?                         @default(0)
+  total_fallido              Int?                         @default(0)
+  schedule_config            Json?                        @default("{}")
+  metadata                   Json?                        @default("{}")
+  created_by                 String?                      @db.Uuid
+  automatizacion_ejecuciones automatizacion_ejecuciones[]
+  ejecutivos                 ejecutivos?                  @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([activa], map: "idx_automatizaciones_activa")
+  @@index([created_by], map: "idx_automatizaciones_created_by")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model conversaciones {
+  id                   String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at           DateTime?         @default(now()) @db.Timestamptz(6)
+  updated_at           DateTime?         @default(now()) @db.Timestamptz(6)
+  external_id          String?           @unique
+  phone_number         String
+  contact_name         String?
+  prospecto_id         String?
+  assigned_to          String?           @db.Uuid
+  status               String?           @default("active")
+  last_message_at      DateTime?         @default(now()) @db.Timestamptz(6)
+  message_count        Int?              @default(0)
+  unread_count         Int?              @default(0)
+  contact_info         Json?             @default("{}")
+  tags                 String[]          @default([])
+  priority             String?           @default("normal")
+  notas                String?
+  handoff_status       String?           @default("bot")
+  handoff_requested_at DateTime?         @db.Timestamptz(6)
+  handoff_accepted_at  DateTime?         @db.Timestamptz(6)
+  agent_last_activity  DateTime?         @db.Timestamptz(6)
+  ejecutivos           ejecutivos?       @relation(fields: [assigned_to], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  prospecto_actual     prospecto_actual? @relation(fields: [prospecto_id], references: [whatsapp], onDelete: NoAction, onUpdate: NoAction)
+  mensajes             mensajes[]
+
+  @@index([assigned_to], map: "idx_conversaciones_asignado")
+  @@index([handoff_status, handoff_requested_at], map: "idx_conversaciones_handoff_status")
+  @@index([last_message_at], map: "idx_conversaciones_last_message")
+  @@index([phone_number], map: "idx_conversaciones_phone")
+  @@index([prospecto_id], map: "idx_conversaciones_prospecto")
+  @@index([status], map: "idx_conversaciones_status")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model ejecutivos {
+  id                         String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at                 DateTime?          @default(now()) @db.Timestamptz(6)
+  updated_at                 DateTime?          @default(now()) @db.Timestamptz(6)
+  nombre                     String
+  email                      String             @unique
+  telefono                   String?
+  avatar_url                 String?
+  carreras_especializacion   String[]           @default([])
+  regiones_cobertura         String[]           @default([])
+  max_prospectos_simultaneos Int?               @default(50)
+  prospectos_activos         Int?               @default(0)
+  tasa_conversion            Decimal?           @default(0.00) @db.Decimal(5, 2)
+  total_conversiones         Int?               @default(0)
+  horario_inicio             DateTime?          @default(dbgenerated("'09:00:00'::time without time zone")) @db.Time(6)
+  horario_fin                DateTime?          @default(dbgenerated("'18:00:00'::time without time zone")) @db.Time(6)
+  timezone                   String?            @default("America/Santiago")
+  dias_trabajo               Int[]              @default([1, 2, 3, 4, 5])
+  activo                     Boolean?           @default(true)
+  disponible                 Boolean?           @default(true)
+  ultimo_login               DateTime?          @db.Timestamptz(6)
+  configuracion              Json?              @default("{}")
+  automatizaciones           automatizaciones[]
+  conversaciones             conversaciones[]
+  prospecto_actual           prospecto_actual[]
+
+  @@index([activo], map: "idx_ejecutivos_activo")
+  @@index([carreras_especializacion], map: "idx_ejecutivos_carreras", type: Gin)
+  @@index([disponible], map: "idx_ejecutivos_disponible")
+  @@index([email], map: "idx_ejecutivos_email")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model fuentes_leads {
+  id                String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at        DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at        DateTime?        @default(now()) @db.Timestamptz(6)
+  nombre            String
+  tipo              String
+  url               String?
+  activa            Boolean?         @default(true)
+  configuracion     Json?            @default("{}")
+  utm_source        String?
+  utm_medium        String?
+  utm_campaign      String?
+  utm_term          String?
+  utm_content       String?
+  campos_requeridos String[]         @default([])
+  campos_opcionales String[]         @default([])
+  mensaje_gracias   String?
+  redirect_url      String?
+  total_leads       Int?             @default(0)
+  leads_hoy         Int?             @default(0)
+  tasa_conversion   Decimal?         @default(0.00) @db.Decimal(5, 2)
+  costo_por_lead    Decimal?         @db.Decimal(8, 2)
+  metadata          Json?            @default("{}")
+  leads_tracking    leads_tracking[]
+
+  @@index([activa], map: "idx_fuentes_activa")
+  @@index([tipo], map: "idx_fuentes_tipo")
+  @@index([utm_campaign], map: "idx_fuentes_utm_campaign")
+  @@index([utm_source], map: "idx_fuentes_utm_source")
+}
+
+model leads_tracking {
+  id              String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at      DateTime?      @default(now()) @db.Timestamptz(6)
+  prospecto_id    String?        @db.Uuid
+  fuente_id       String?        @db.Uuid
+  session_id      String?
+  ip_address      String?        @db.Inet
+  user_agent      String?
+  referrer        String?
+  utm_source      String?
+  utm_medium      String?
+  utm_campaign    String?
+  utm_term        String?
+  utm_content     String?
+  pais            String?
+  ciudad          String?
+  region          String?
+  formulario_id   String?
+  landing_page_id String?
+  campana_id      String?
+  primera_visita  DateTime?      @db.Timestamptz(6)
+  conversion      DateTime?      @db.Timestamptz(6)
+  metadata        Json?          @default("{}")
+  fuentes_leads   fuentes_leads? @relation(fields: [fuente_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([fuente_id], map: "idx_tracking_fuente")
+  @@index([prospecto_id], map: "idx_tracking_prospecto")
+  @@index([session_id], map: "idx_tracking_session")
+  @@index([utm_campaign], map: "idx_tracking_utm_campaign")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model mensajes {
+  id              String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  created_at      DateTime?       @default(now()) @db.Timestamptz(6)
+  conversacion_id String?         @db.Uuid
+  external_id     String?
+  content         String
+  message_type    String?         @default("text")
+  type            String
+  sender_id       String?
+  sender_name     String?
+  is_read         Boolean?        @default(false)
+  delivered_at    DateTime?       @db.Timestamptz(6)
+  read_at         DateTime?       @db.Timestamptz(6)
+  metadata        Json?           @default("{}")
+  conversaciones  conversaciones? @relation(fields: [conversacion_id], references: [id], onDelete: Cascade, onUpdate: NoAction)
+
+  @@index([conversacion_id], map: "idx_mensajes_conversacion")
+  @@index([created_at], map: "idx_mensajes_created_at")
+  @@index([is_read], map: "idx_mensajes_read")
+  @@index([type], map: "idx_mensajes_type")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model prospecto_actual {
+  whatsapp              String           @id
+  nombre                String
+  email                 String?
+  telefono              String?
+  edad                  Int?
+  region                String?
+  ciudad                String?
+  pais                  String?          @default("Chile")
+  carrera_interes       String?          @default("Sin especificar")
+  facultad_interes      String?          @default("")
+  nivel_interes         String?          @default("medio")
+  estado                String?          @default("nuevo")
+  assigned_to           String?          @db.Uuid
+  ejecutivo_asignado_at DateTime?        @db.Timestamptz(6)
+  ultimo_contacto       DateTime?        @db.Timestamptz(6)
+  proximo_seguimiento   DateTime?        @db.Timestamptz(6)
+  total_sesiones        Int?             @default(1)
+  primera_interaccion   DateTime?        @default(now()) @db.Timestamptz(6)
+  ultima_interaccion    DateTime?        @default(now()) @db.Timestamptz(6)
+  tipo_consulta_actual  String?
+  perfil_usuario        String?          @default(dbgenerated("\nCASE\n    WHEN ((total_sesiones = 1) AND (tipo_consulta_actual ~~ 'abandono%'::text)) THEN 'abandono_inicial'::text\n    WHEN ((total_sesiones > 1) AND (tipo_consulta_actual !~~ 'abandono%'::text)) THEN 'reconvertido'::text\n    WHEN (total_sesiones > 3) THEN 'altamente_interesado'::text\n    WHEN (carrera_interes <> 'Sin especificar'::text) THEN 'interes_definido'::text\n    ELSE 'exploratorio'::text\nEND"))
+  es_prioritario        Boolean?         @default(dbgenerated("((total_sesiones > 2) OR (nivel_interes = ANY (ARRAY['alto'::text, 'muy_alto'::text, 'urgente'::text])) OR (tipo_consulta_actual = 'solicitar_asesor'::text))"))
+  fuente                String?          @default("uniacc_chatbot")
+  utm_source            String?
+  utm_campaign          String?
+  metadata              Json?            @default("{}")
+  notas                 String?
+  tags                  String[]
+  created_at            DateTime?        @default(now()) @db.Timestamptz(6)
+  updated_at            DateTime?        @default(now()) @db.Timestamptz(6)
+  telefono_confirmado   Boolean?         @default(true)
+  preferencia_contacto  String?          @default("normal")
+  conversaciones        conversaciones[]
+  ejecutivos            ejecutivos?      @relation(fields: [assigned_to], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([ultima_interaccion(sort: Desc)], map: "idx_actual_actividad")
+  @@index([perfil_usuario, total_sesiones], map: "idx_actual_perfil")
+  @@index([es_prioritario, nivel_interes, ultima_interaccion], map: "idx_actual_prioridad")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+/// This model or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+model prospecto_historial {
+  id                      String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  whatsapp                String
+  sesion_numero           Int
+  tipo_consulta           String
+  nombre                  String
+  email                   String?
+  telefono                String?
+  edad                    Int?
+  region                  String?
+  carrera_interes         String?                  @default("Sin especificar")
+  facultad_interes        String?                  @default("")
+  nivel_interes           String?                  @default("medio")
+  duracion_sesion         Unsupported("interval")?
+  mensajes_intercambiados Int?                     @default(0)
+  flujo_completado        Boolean?                 @default(false)
+  razon_finalizacion      String?                  @default("completado")
+  paso_abandono           String?
+  datos_capturados        Json?                    @default("{}")
+  sesion_inicio           DateTime?                @default(now()) @db.Timestamptz(6)
+  sesion_fin              DateTime?                @db.Timestamptz(6)
+  created_at              DateTime?                @default(now()) @db.Timestamptz(6)
+  fuente                  String?                  @default("uniacc_chatbot")
+  metadata                Json?                    @default("{}")
+  evolucion_interes       String?                  @default(dbgenerated("\nCASE\n    WHEN ((carrera_interes <> 'Sin especificar'::text) AND (sesion_numero = 1)) THEN 'interes_inicial'::text\n    WHEN ((carrera_interes <> 'Sin especificar'::text) AND (sesion_numero > 1)) THEN 'definicion_interes'::text\n    WHEN ((tipo_consulta ~~ 'abandono%'::text) AND (sesion_numero = 1)) THEN 'abandono_inicial'::text\n    WHEN ((tipo_consulta !~~ 'abandono%'::text) AND (sesion_numero > 1)) THEN 'reconversion'::text\n    ELSE 'exploracion'::text\nEND"))
+  telefono_confirmado     Boolean?                 @default(true)
+  preferencia_contacto    String?                  @default("normal")
+
+  @@unique([whatsapp, sesion_numero])
+  @@index([evolucion_interes, carrera_interes], map: "idx_historial_evolucion")
+  @@index([created_at(sort: Desc)], map: "idx_historial_fecha")
+  @@index([tipo_consulta, created_at], map: "idx_historial_tipo_consulta")
+  @@index([whatsapp, sesion_numero], map: "idx_historial_whatsapp_sesion")
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model prueba {
+  id         BigInt   @id @default(autoincrement())
+  created_at DateTime @default(now()) @db.Timestamptz(6)
+}
+
+/// This view or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+view analytics_reconversion {
+  fecha                     DateTime? @db.Timestamptz(6)
+  nuevos_usuarios           BigInt?
+  usuarios_reconvertidos    BigInt?
+  tasa_reconversion_pct     Decimal?  @db.Decimal
+  promedio_sesiones_por_dia Decimal?  @db.Decimal
+}
+
+/// This view or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+view dashboard_prospectos {
+  whatsapp            String?
+  nombre              String?
+  email               String?
+  telefono            String?
+  carrera_interes     String?
+  facultad_interes    String?
+  nivel_interes       String?
+  estado              String?
+  perfil_usuario      String?
+  total_sesiones      Int?
+  es_prioritario      Boolean?
+  primera_interaccion DateTime? @db.Timestamptz(6)
+  ultima_interaccion  DateTime? @db.Timestamptz(6)
+  assigned_to         String?   @db.Uuid
+  proximo_seguimiento DateTime? @db.Timestamptz(6)
+  recencia            String?
+  horas_engagement    Decimal?  @db.Decimal
+}
+
+view metricas_carreras {
+  carrera_interes               String?
+  usuarios_unicos               BigInt?
+  total_consultas               BigInt?
+  promedio_sesiones_por_usuario Decimal?                 @db.Decimal
+  reconversiones                BigInt?
+  duracion_promedio_sesion      Unsupported("interval")?
+}
+
+/// This view or at least one of its fields has comments in the database, and requires an additional setup for migrations: Read more: https://pris.ly/d/database-comments
+view prospectos_privacidad {
+  whatsapp             String?
+  nombre               String?
+  email                String?
+  telefono             String?
+  telefono_confirmado  Boolean?
+  preferencia_contacto String?
+  nivel_interes        String?
+  total_sesiones       Int?
+  ultima_interaccion   DateTime? @db.Timestamptz(6)
+  nota_privacidad      String?
+}

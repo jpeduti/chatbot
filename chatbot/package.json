@@ -4,7 +4,7 @@
   "description": "Bot conversacional para WhatsApp Business API - UNIACC",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "concurrently \"nodemon -r tsconfig-paths/register src/index.ts\" \"npm run watch:frontend\"",
+    "dev": "ts-node src/index.ts",
     "dev:backend": "nodemon -r tsconfig-paths/register src/index.ts",
     "build": "tsc",
     "build:frontend": "tsc -p tsconfig.frontend.json",
@@ -15,12 +15,11 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:flows": "jest --testPathPattern=tests/flows",
-    "test:integration": "jest --testPathPattern=tests/integration",
+    "test:integration": "jest --testPathPattern=src/testing.*integration",
     "test:unit": "jest --testPathPattern=tests/unit",
     "test:flows:interactive": "ts-node src/testing/runners/interactive-runner.ts",
     "test:flows:report": "ts-node src/testing/runners/flow-runner.ts",
     "test:stress": "ts-node src/testing/runners/stress-runner.ts",
-    "test:integration": "jest --testPathPattern=src/testing.*integration",
     "test:demo": "ts-node src/testing/examples/simple-demo.ts",
     "test:demo:basic": "ts-node src/testing/examples/simple-demo.ts basic",
     "test:demo:full": "ts-node src/testing/examples/complete-test-example.ts",
@@ -28,7 +27,9 @@
     "test:demo:concurrent": "ts-node src/testing/examples/complete-test-example.ts concurrent",
     "test:pipeline": "ts-node src/testing/runners/flow-runner.ts full --monitor --export",
     "test:load": "ts-node src/testing/runners/flow-runner.ts load --monitor",
-    "test:performance": "ts-node src/testing/examples/complete-test-example.ts performance"
+    "test:performance": "ts-node src/testing/examples/complete-test-example.ts performance",
+    "dev:legacy": "concurrently \"nodemon -r tsconfig-paths/register src/index.ts\" \"npm run watch:frontend\"",
+    "dev:new": "ts-node src/index.ts"
   },
   "keywords": [
     "chatbot",
@@ -40,12 +41,14 @@
   "author": "Juan Silva",
   "license": "MIT",
   "dependencies": {
+    "@prisma/client": "^6.15.0",
     "@supabase/supabase-js": "^2.56.0",
     "axios": "^1.11.0",
     "cors": "^2.8.5",
     "dotenv": "^17.2.1",
     "express": "4.18.3",
-    "helmet": "^7.1.0"
+    "helmet": "^7.1.0",
+    "prisma": "^6.15.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
@@ -58,12 +61,14 @@
     "ts-jest": "^29.2.5",
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
-    "typescript": "^5.8.0"
+    "typescript": "^5.9.2"
   },
   "jest": {
     "preset": "ts-jest",
     "testEnvironment": "node",
-    "roots": ["<rootDir>/src"],
+    "roots": [
+      "<rootDir>/src"
+    ],
     "testMatch": [
       "**/src/testing/**/*.test.ts",
       "**/src/testing/**/*.spec.ts",
@@ -79,8 +84,14 @@
       "!src/testing/**/*.ts"
     ],
     "coverageDirectory": "coverage",
-    "coverageReporters": ["text", "lcov", "html"],
-    "setupFilesAfterEnv": ["<rootDir>/src/testing/config/test-environment.ts"],
+    "coverageReporters": [
+      "text",
+      "lcov",
+      "html"
+    ],
+    "setupFilesAfterEnv": [
+      "<rootDir>/src/testing/config/test-environment.ts"
+    ],
     "moduleNameMapping": {
       "@/*": "<rootDir>/src/*",
       "@testing/*": "<rootDir>/src/testing/*"
