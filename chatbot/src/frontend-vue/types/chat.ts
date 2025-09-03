@@ -61,6 +61,9 @@ export interface ChatState {
   errorMessage?: string
   currentUserId: string
   sessionId?: string
+  sessionActive: boolean
+  timeoutWarning: boolean
+  remainingTime: number
 }
 
 export interface ChatResponse {

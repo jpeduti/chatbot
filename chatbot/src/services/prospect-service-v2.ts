@@ -210,6 +210,60 @@ export class ProspectServiceV2 {
   }
 
   /**
+   * 💾 Guardar datos por timeout usando Repository V2
+   */
+  async saveTimeoutSession(userId: string, capturedData: any): Promise<ProspectResult> {
+    try {
+      console.log(`💾 [PROSPECT-V2] Guardando datos por timeout para ${userId}`)
+      
+      // 🔍 Verificar si existe prospecto actual
+      const existingProspect = await this.prospectoActualRepo.findByWhatsapp(userId)
+      
+      if (existingProspect) {
+        // 📝 Actualizar existente con tipo de consulta de timeout
+        const updateData = {
+          tipo_consulta_actual: 'abandono_por_timeout',
+          nivel_interes: 'bajo',
+          ultima_interaccion: new Date()
+        }
+        
+        const updated = await this.prospectoActualRepo.update(userId, updateData)
+        console.log(`✅ [PROSPECT-V2] Prospecto actualizado por timeout: ${existingProspect.nombre}`)
+        
+        return {
+          success: true,
+          message: 'Datos guardados por timeout (actualización)',
+          data: this.mapPrismaToProspectoData(updated!)
+        }
+      } else {
+        // 🆕 Crear nuevo prospecto con datos mínimos capturados
+        const timeoutData: ProspectoData = {
+          whatsapp: userId,
+          nombre: capturedData.nombre || 'Usuario (timeout)',
+          email: capturedData.email || null,
+          telefono: capturedData.telefono || userId,
+          telefono_confirmado: capturedData.telefono_confirmado || false,
+          tipo_consulta: 'abandono_por_timeout',
+          nivel_interes: 'bajo',
+          source: 'timeout_save'
+        }
+        
+        const result = await this.guardarProspecto(userId, timeoutData)
+        console.log(`✅ [PROSPECT-V2] Nuevo prospecto creado por timeout`)
+        
+        return result
+      }
+    } catch (error) {
+      console.error(`❌ [PROSPECT-V2] Error guardando datos por timeout ${userId}:`, error)
+      return {
+        success: false,
+        message: 'Error guardando datos por timeout',
+        error: error instanceof Error ? error.message : 'Error desconocido'
+      }
+    }
+  }
+
+  /**
    * 📊 Finalizar sesión usando Repository
    */
   async finalizarSesion(userId: string, razon: string = 'completada'): Promise<SessionResult> {

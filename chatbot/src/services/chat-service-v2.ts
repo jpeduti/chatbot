@@ -77,6 +77,9 @@ export class ChatServiceV2 {
     
     // 🎪 Inicializar FlowContext System
     this.flowContextManager = new FlowContextManager(cacheManager, prospectoActualRepo)
+    
+    // 🔗 Configurar FlowContextManager en TimeoutService para acceso a datos V2
+    this.timeoutService.setFlowContextManager(this.flowContextManager)
     this.prospectCaptureFlow = new ProspectCaptureFlow(
       this.flowContextManager,
       this.validationService,
@@ -133,6 +136,24 @@ export class ChatServiceV2 {
     try {
       const cleanMessage = message.trim()
       console.log(`🤖 [${userId}] Procesando: "${cleanMessage}" con FlowContext V2`)
+      console.log(`🔗 [${userId}] TimeoutService configurado con FlowContextManager: ${this.timeoutService.isFlowContextManagerConfigured()}`)
+
+      // ⏰ VERIFICAR MENSAJES PENDIENTES DE TIMEOUT primero
+      const pendingWarning = this.timeoutService.getPendingWarningMessage(userId)
+      const pendingTimeout = this.timeoutService.getPendingTimeoutMessage(userId)
+      
+      if (pendingTimeout) {
+        console.log(`⏰ [${userId}] Entregando mensaje de timeout pendiente`)
+        return pendingTimeout
+      }
+      
+      if (pendingWarning) {
+        console.log(`⚠️ [${userId}] Entregando mensaje de warning pendiente`)
+        // Continuar con el procesamiento normal después del warning
+      }
+
+      // ⏰ CONFIGURAR TIMEOUT para esta sesión (usar V1 por ahora)
+      this.timeoutService.setSessionTimeout(userId)
 
       // 🔍 Verificar si el usuario ya completó captura inicial
       const userContext = await this.getUserContext(userId)
@@ -205,7 +226,13 @@ export class ChatServiceV2 {
           }
         }
         
-        return flowResult.message
+        // ⚠️ Incluir warning si existe
+        let finalMessage = flowResult.message
+        if (pendingWarning) {
+          finalMessage = `⚠️ ${pendingWarning}\n\n${flowResult.message}`
+        }
+        
+        return finalMessage
       } else {
         console.error(`❌ [${userId}] Error en FlowContext:`, flowResult.message)
         return flowResult.message || this.messageFormatter.formatErrorMessage()

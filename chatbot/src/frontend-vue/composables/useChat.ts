@@ -24,10 +24,19 @@ export function useChat() {
     isTyping: false,
     isSending: false,
     hasError: false,
-    currentUserId: '56999888777'
+    currentUserId: '56999888777',
+    sessionActive: true,
+    timeoutWarning: false,
+    remainingTime: 0
   })
 
   const responseTimes = ref<number[]>([])
+  
+  // ⏰ Sistema de Timeout
+  const SESSION_TIMEOUT = 20000 // 20 segundos (sync con backend)
+  const WARNING_TIMEOUT = 10000 // 10 segundos
+  let sessionTimer: NodeJS.Timeout | null = null
+  let warningTimer: NodeJS.Timeout | null = null
 
   // Computed properties
   const lastMessage = computed(() => 
@@ -43,6 +52,60 @@ export function useChat() {
   )
 
   const hasMessages = computed(() => messages.value.length > 0)
+
+  // ⏰ Funciones de Timeout
+  const clearTimeouts = () => {
+    if (sessionTimer) {
+      clearTimeout(sessionTimer)
+      sessionTimer = null
+    }
+    if (warningTimer) {
+      clearTimeout(warningTimer)
+      warningTimer = null
+    }
+    chatState.timeoutWarning = false
+    chatState.remainingTime = 0
+  }
+
+  const startSessionTimeout = () => {
+    clearTimeouts()
+    
+    // Reset estado
+    chatState.sessionActive = true
+    chatState.timeoutWarning = false
+    chatState.remainingTime = SESSION_TIMEOUT / 1000
+    
+    // Warning timer
+    warningTimer = setTimeout(() => {
+      chatState.timeoutWarning = true
+      addMessage(
+        '⚠️ Tu sesión expirará en 10 segundos por inactividad. Escribe algo para continuar.',
+        'system',
+        { type: 'warning' }
+      )
+    }, WARNING_TIMEOUT)
+    
+    // Session timeout
+    sessionTimer = setTimeout(() => {
+      chatState.sessionActive = false
+      chatState.timeoutWarning = false
+      addMessage(
+        '⏰ Sesión finalizada por inactividad. Tus datos han sido guardados. Escribe "Hola" para iniciar una nueva conversación.',
+        'system',
+        { type: 'timeout' }
+      )
+      clearTimeouts()
+    }, SESSION_TIMEOUT)
+    
+    // Countdown timer
+    const countdown = setInterval(() => {
+      if (chatState.remainingTime > 0) {
+        chatState.remainingTime--
+      } else {
+        clearInterval(countdown)
+      }
+    }, 1000)
+  }
 
   // Métodos principales
   const addMessage = (content: string, sender: 'user' | 'bot' | 'system', metadata?: any) => {
@@ -86,6 +149,9 @@ export function useChat() {
 
     chatState.isSending = true
     chatState.hasError = false
+
+    // ⏰ Reiniciar timeout con cada mensaje
+    startSessionTimeout()
 
     // Agregar mensaje del usuario
     addMessage(content, 'user')
@@ -217,6 +283,9 @@ export function useChat() {
     chatState.hasError = false
     chatState.errorMessage = undefined
     
+    // ⏰ Limpiar timeouts al limpiar chat
+    clearTimeouts()
+    
     // Agregar mensaje de bienvenida
     addMessage(
       '¡Hola! 👋 Soy el chatbot de UNIACC v3.0\n\n🚀 **Nueva Interfaz Vue.js:**\n✅ Diseño moderno y responsive\n✅ Typing indicators\n✅ Real-time analytics\n✅ Mobile-first UI\n✅ Chat fluido\n\n*Escribe "hola" para comenzar...*',
@@ -293,6 +362,10 @@ export function useChat() {
     handleQuickReply,
     showTyping,
     hideTyping,
-    initializeChat
+    initializeChat,
+    
+    // ⏰ Timeout methods
+    clearTimeouts,
+    startSessionTimeout
   }
 }

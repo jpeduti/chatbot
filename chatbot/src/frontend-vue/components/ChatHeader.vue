@@ -21,6 +21,12 @@
         <h2 class="text-lg font-semibold">UNIACC Assistant</h2>
         <p class="text-sm text-green-200">
           {{ isConnected ? '🟢 En línea' : '🔴 Desconectado' }} • {{ currentVersion.toUpperCase() }}
+          <span v-if="timeoutWarning" class="ml-2 text-yellow-300 animate-pulse">
+            ⚠️ Expira en {{ remainingTime }}s
+          </span>
+          <span v-if="!sessionActive" class="ml-2 text-red-300">
+            ⏰ Sesión expirada
+          </span>
         </p>
       </div>
     </div>
@@ -56,6 +62,9 @@ interface Props {
   isConnected: boolean
   currentVersion: 'v1' | 'v2'
   userId: string
+  sessionActive?: boolean
+  timeoutWarning?: boolean
+  remainingTime?: number
 }
 
 defineProps<Props>()

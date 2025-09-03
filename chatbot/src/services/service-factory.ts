@@ -94,7 +94,7 @@ export class ServiceFactory {
     
     // 3. Crear servicios con múltiples dependencias
     const timeoutService = this.getOrCreate('timeoutService', () => 
-      new TimeoutService(stateService, prospectService)
+      new TimeoutService(stateService, prospectService, prospectServiceV2)
     )
     
     // 4. Crear FlowHandler (manejo avanzado de flujos)

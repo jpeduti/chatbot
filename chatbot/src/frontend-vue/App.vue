@@ -21,6 +21,9 @@
           :is-connected="chatState.isConnected"
           :current-version="metrics.activeVersion"
           :user-id="chatState.currentUserId"
+          :session-active="chatState.sessionActive"
+          :timeout-warning="chatState.timeoutWarning"
+          :remaining-time="chatState.remainingTime"
         />
 
         <!-- Área de Mensajes -->
