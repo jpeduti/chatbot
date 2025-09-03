@@ -96,25 +96,40 @@ export class PrismaProspectoActualRepository implements IProspectoActualReposito
 
   async create(data: CreateProspectoData): Promise<prospecto_actual> {
     try {
+      console.log(`🔍 [REPO-CREATE] Datos recibidos para crear:`, JSON.stringify(data, null, 2))
+      
+      const insertData = {
+        whatsapp: data.whatsapp,
+        nombre: data.nombre,
+        email: data.email,
+        telefono: data.telefono,
+        edad: data.edad,
+        region: data.region,
+        carrera_interes: data.carrera_interes || 'Sin especificar',
+        facultad_interes: data.facultad_interes || '',
+        nivel_interes: data.nivel_interes || 'medio',
+        tipo_consulta_actual: data.tipo_consulta || 'consulta_general',
+        telefono_confirmado: data.telefono_confirmado ?? true,
+        preferencia_contacto: data.preferencia_contacto || 'normal',
+        metadata: data.metadata || {},
+        primera_interaccion: new Date(),
+        ultima_interaccion: new Date(),
+        total_sesiones: 1
+      }
+      
+      console.log(`📝 [REPO-CREATE] Datos enviados a Prisma:`, JSON.stringify(insertData, null, 2))
+      
       const prospecto = await this.prisma.prospecto_actual.create({
-        data: {
-          whatsapp: data.whatsapp,
-          nombre: data.nombre,
-          email: data.email,
-          telefono: data.telefono,
-          edad: data.edad,
-          region: data.region,
-          carrera_interes: data.carrera_interes || 'Sin especificar',
-          nivel_interes: data.nivel_interes || 'medio',
-          tipo_consulta_actual: data.tipo_consulta || 'consulta_general',
-          telefono_confirmado: data.telefono_confirmado ?? true,
-          preferencia_contacto: data.preferencia_contacto || 'normal',
-          metadata: data.metadata || {},
-          primera_interaccion: new Date(),
-          ultima_interaccion: new Date(),
-          total_sesiones: 1
-        }
+        data: insertData
       })
+      
+      console.log(`✅ [REPO-CREATE] Prospecto creado en BD:`, JSON.stringify({
+        whatsapp: prospecto.whatsapp,
+        nombre: prospecto.nombre,
+        carrera_interes: prospecto.carrera_interes,
+        facultad_interes: prospecto.facultad_interes,
+        nivel_interes: prospecto.nivel_interes
+      }, null, 2))
 
       // Clear cache
       this.invalidateCache(data.whatsapp)
@@ -129,13 +144,27 @@ export class PrismaProspectoActualRepository implements IProspectoActualReposito
 
   async update(whatsapp: string, data: UpdateProspectoData): Promise<prospecto_actual | null> {
     try {
+      console.log(`🔍 [REPO-UPDATE] Datos recibidos para actualizar ${whatsapp}:`, JSON.stringify(data, null, 2))
+      
+      const updateData = {
+        ...data,
+        updated_at: new Date()
+      }
+      
+      console.log(`📝 [REPO-UPDATE] Datos enviados a Prisma:`, JSON.stringify(updateData, null, 2))
+      
       const prospecto = await this.prisma.prospecto_actual.update({
         where: { whatsapp },
-        data: {
-          ...data,
-          updated_at: new Date()
-        }
+        data: updateData
       })
+      
+      console.log(`✅ [REPO-UPDATE] Prospecto actualizado en BD:`, JSON.stringify({
+        whatsapp: prospecto.whatsapp,
+        nombre: prospecto.nombre,
+        carrera_interes: prospecto.carrera_interes,
+        facultad_interes: prospecto.facultad_interes,
+        nivel_interes: prospecto.nivel_interes
+      }, null, 2))
 
       // Clear cache
       this.invalidateCache(whatsapp)

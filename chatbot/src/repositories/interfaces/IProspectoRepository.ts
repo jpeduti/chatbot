@@ -86,6 +86,7 @@ export interface CreateProspectoData {
   edad?: number | null
   region?: string | null
   carrera_interes?: string | null
+  facultad_interes?: string | null
   nivel_interes?: string | null
   tipo_consulta?: string | null
   telefono_confirmado?: boolean | null
@@ -100,6 +101,7 @@ export interface UpdateProspectoData {
   edad?: number
   region?: string
   carrera_interes?: string
+  facultad_interes?: string
   nivel_interes?: string
   estado?: string
   telefono_confirmado?: boolean

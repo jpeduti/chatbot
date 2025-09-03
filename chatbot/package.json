@@ -4,7 +4,8 @@
   "description": "Bot conversacional para WhatsApp Business API - UNIACC",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "ts-node src/index.ts",
+    "dev": "ts-node --transpile-only src/index.ts",
+    "dev:force": "ts-node --compiler-options '{\"skipLibCheck\":true}' src/index.ts",
     "dev:backend": "nodemon -r tsconfig-paths/register src/index.ts",
     "build": "tsc",
     "build:frontend": "tsc -p tsconfig.frontend.json",
@@ -53,6 +54,8 @@
     "autoprefixer": "^10.4.21",
     "axios": "^1.11.0",
     "cors": "^2.8.5",
+    "date-fns": "^4.1.0",
+    "date-fns-tz": "^3.2.0",
     "dotenv": "^17.2.1",
     "express": "4.18.3",
     "helmet": "^7.1.0",

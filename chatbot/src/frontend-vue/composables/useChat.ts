@@ -132,7 +132,7 @@ export function useChat() {
       let analytics = null
 
       if (metrics.activeVersion === 'v2') {
-        botResponse = result.conversation?.bot_response || result.response || 'Sin respuesta'
+        botResponse = result.conversation?.bot_response || 'Sin respuesta'
         analytics = result.analytics
         if (analytics?.cacheHit) {
           metrics.cacheHitRate = Math.min(100, metrics.cacheHitRate + 1)

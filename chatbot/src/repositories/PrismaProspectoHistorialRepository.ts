@@ -218,6 +218,8 @@ export class PrismaProspectoHistorialRepository implements IProspectoHistorialRe
     telefono?: string
     edad?: number
     region?: string
+    carrera_interes?: string
+    facultad_interes?: string
     metadata?: any
   }): Promise<prospecto_historial> {
     try {
@@ -231,8 +233,8 @@ export class PrismaProspectoHistorialRepository implements IProspectoHistorialRe
           telefono: data.telefono || null,
           edad: data.edad || null,
           region: data.region || null,
-          carrera_interes: 'Sin especificar',
-          facultad_interes: '',
+          carrera_interes: data.carrera_interes || 'Sin especificar',
+          facultad_interes: data.facultad_interes || '',
           nivel_interes: 'medio',
           sesion_inicio: new Date(),
           sesion_fin: null,

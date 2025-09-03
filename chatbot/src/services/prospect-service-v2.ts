@@ -48,6 +48,8 @@ export class ProspectServiceV2 {
         telefono: datos.telefono || undefined,
         edad: datos.edad,
         region: datos.region,
+        carrera_interes: (datos as any).carrera_interes || 'Sin especificar',
+        facultad_interes: (datos as any).facultad_interes || 'Sin especificar',
         metadata: {
           campo_capturado: campo,
           valor_anterior: (datos as any)[campo],
@@ -151,6 +153,7 @@ export class ProspectServiceV2 {
       
       if (existente) {
         // 🔄 Actualizar existente
+        console.log(`🔍 [SERVICE-V2] Datos originales para actualización:`, JSON.stringify(datos, null, 2))
         const datosActualizacion = this.mapProspectoDataToUpdate(datos)
         const prospecto = await this.prospectoActualRepo.update(userId, datosActualizacion)
         
@@ -172,6 +175,7 @@ export class ProspectServiceV2 {
           edad: datos.edad || null,
           region: datos.region || null,
           carrera_interes: datos.carrera_interes || 'Sin especificar',
+          facultad_interes: datos.facultad_interes || '',
           nivel_interes: datos.nivel_interes || 'medio',
           tipo_consulta: datos.tipo_consulta || 'consulta_general',
           telefono_confirmado: datos.telefono_confirmado || true,
@@ -181,6 +185,8 @@ export class ProspectServiceV2 {
             timestamp_creacion: new Date().toISOString()
           }
         }
+        
+        console.log(`🔍 [SERVICE-V2] Creando prospecto con datos:`, JSON.stringify(datosCreacion, null, 2))
         
         const prospecto = await this.prospectoActualRepo.create(datosCreacion as any)
         
@@ -356,18 +362,22 @@ export class ProspectServiceV2 {
   }
 
   private mapProspectoDataToUpdate(datos: ProspectoData): any {
-    return {
+    const mapped = {
       nombre: datos.nombre,
       email: datos.email,
       telefono: datos.telefono,
       edad: datos.edad,
       region: datos.region,
       carrera_interes: datos.carrera_interes,
+      facultad_interes: datos.facultad_interes,
       nivel_interes: datos.nivel_interes,
       tipo_consulta_actual: datos.tipo_consulta,
       telefono_confirmado: datos.telefono_confirmado,
       preferencia_contacto: datos.preferencia_contacto,
       ultima_interaccion: new Date()
     }
+    
+    console.log(`🔍 [SERVICE-V2] mapProspectoDataToUpdate resultado:`, JSON.stringify(mapped, null, 2))
+    return mapped
   }
 }

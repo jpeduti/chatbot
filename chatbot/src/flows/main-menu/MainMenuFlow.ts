@@ -869,12 +869,14 @@ Escribe el número de tu opción 📝`
         engagement_score: this.calculateEngagementScore(context)
       }
 
-      // Actualizar prospecto con intereses (solo campos obligatorios)
+      // Actualizar prospecto con intereses (PRESERVANDO facultad y carrera)
       await this.prospectService.guardarProspecto(context.userId, {
         whatsapp: context.userId,
         nombre: context.capturedData.nombre || 'Usuario',
         email: context.capturedData.email || null,
         telefono: context.capturedData.telefono || null,
+        facultad_interes: context.capturedData.facultad_interes || null,
+        carrera_interes: context.capturedData.carrera_interes || null,
         source: context.sessionMetadata.source || 'unknown',
         nivel_interes: 'alto', // MainMenu engagement = alto interés
         tipo_consulta: 'post_capture_engagement',
@@ -1021,6 +1023,17 @@ Escribe el número de tu opción 📝`
         userState
       )
       console.log(`📝 [${context.userId}] Facultad seleccionada guardada: ${selectedFacultad.nombre}`)
+
+      // 💾 GUARDAR INMEDIATAMENTE EN PROSPECTO_ACTUAL
+      await this.prospectService.guardarProspecto(context.userId, {
+        whatsapp: context.userId,
+        nombre: context.capturedData.nombre || 'Usuario',
+        email: context.capturedData.email || null,
+        telefono: context.capturedData.telefono || null,
+        facultad_interes: selectedFacultad.nombre,
+        source: context.sessionMetadata.source || 'chat-demo'
+      })
+      console.log(`💾 [${context.userId}] Facultad guardada en prospecto_actual: ${selectedFacultad.nombre}`)
     } catch (error) {
       console.error(`❌ [${context.userId}] Error guardando selección de facultad:`, error)
     }
@@ -1109,6 +1122,18 @@ ${carrerasList}
         userState
       )
       console.log(`📝 [${context.userId}] Carrera seleccionada guardada: ${selectedCarrera.nombre}`)
+
+      // 💾 GUARDAR INMEDIATAMENTE EN PROSPECTO_ACTUAL (AMBOS CAMPOS)
+      await this.prospectService.guardarProspecto(context.userId, {
+        whatsapp: context.userId,
+        nombre: context.capturedData.nombre || 'Usuario',
+        email: context.capturedData.email || null,
+        telefono: context.capturedData.telefono || null,
+        facultad_interes: facultad.nombre,
+        carrera_interes: selectedCarrera.nombre,
+        source: context.sessionMetadata.source || 'chat-demo'
+      })
+      console.log(`💾 [${context.userId}] Carrera Y Facultad guardadas en prospecto_actual: ${selectedCarrera.nombre} | ${facultad.nombre}`)
     } catch (error) {
       console.error(`❌ [${context.userId}] Error guardando selección de carrera:`, error)
     }
