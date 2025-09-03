@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚀 UNIACC Chat Demo Vue.js - Modern UI</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            color: white;
+        }
+
+        .loading-spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 18px;
+            font-weight: 500;
+            margin-bottom: 10px;
+        }
+
+        .loading-subtext {
+            font-size: 14px;
+            opacity: 0.8;
+            text-align: center;
+            max-width: 400px;
+            line-height: 1.5;
+        }
+
+        .version-info {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px 15px;
+            border-radius: 20px;
+            color: white;
+            font-size: 12px;
+            backdrop-filter: blur(10px);
+        }
+
+        /* Ocultar el loading cuando Vue se monte */
+        .vue-loaded #loading {
+            display: none !important;
+        }
+
+        /* Iframe para la app Vue construida */
+        #vue-app-frame {
+            display: none;
+            width: 100%;
+            height: 100vh;
+            border: none;
+        }
+
+        .vue-loaded #vue-app-frame {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <!-- Badge de Versión -->
+    <div class="version-info">
+        🚀 Vue.js v3.0 • Modern UI
+    </div>
+
+    <!-- Loading Screen -->
+    <div id="loading" class="loading-container">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Cargando UNIACC Chat Vue.js</div>
+        <div class="loading-subtext">
+            ✨ Interfaz moderna con Vue 3, TypeScript y Tailwind CSS<br>
+            🚀 Componentes interactivos y responsive design<br>
+            ⚡ Real-time messaging con quick replies
+        </div>
+    </div>
+
+    <!-- Vue App -->
+    <div id="vue-app-container">
+        <!-- El contenido Vue se cargará aquí -->
+    </div>
+
+    <script>
+        // Simulación de carga y redirección a la app Vue construida
+        let loadingProgress = 0;
+        const loadingInterval = setInterval(() => {
+            loadingProgress += Math.random() * 20;
+            
+            if (loadingProgress >= 100) {
+                clearInterval(loadingInterval);
+                
+                // Redirigir a la aplicación Vue construida
+                setTimeout(() => {
+                    window.location.href = '/vue-chat/index.html';
+                }, 500);
+            }
+        }, 100);
+
+        // Fallback: redirigir después de 3 segundos máximo
+        setTimeout(() => {
+            if (loadingProgress < 100) {
+                window.location.href = '/vue-chat/index.html';
+            }
+        }, 3000);
+
+        // Log de inicialización
+        console.log('🚀 [VUE-CHAT-LOADER] Iniciando carga de la aplicación Vue.js');
+        console.log('✨ [VUE-CHAT-LOADER] Preparando interfaz moderna para UNIACC');
+    </script>
+</body>
+</html>

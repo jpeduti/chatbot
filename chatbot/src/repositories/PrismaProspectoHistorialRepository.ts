@@ -244,8 +244,8 @@ export class PrismaProspectoHistorialRepository implements IProspectoHistorialRe
           fuente: 'uniacc_chatbot',
           metadata: data.metadata || {},
           telefono_confirmado: true,
-          preferencia_contacto: 'normal',
-          evolucion_interes: null // Added missing required field
+          preferencia_contacto: 'normal'
+          // evolucion_interes se omite porque es columna generada (calculada automáticamente)
         }
       })
 

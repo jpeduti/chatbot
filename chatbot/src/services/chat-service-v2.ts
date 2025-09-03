@@ -15,6 +15,16 @@ import { FlowResult } from '../domain/types/flow'
 import { IProspectoActualRepository, IProspectoHistorialRepository } from '../repositories/interfaces/IProspectoRepository'
 import { detectPhoneFromUserId, generatePhoneConfirmationMessage } from '../utils/phone-formatter'
 
+// 🎪 Import ProspectCapture V2 con FlowContext
+import { ProspectCaptureFlow } from '../flows/prospect-capture'
+import { AdvisorRequestFlow } from '../flows/advisor-request'
+import { MainMenuFlow } from '../flows/main-menu'
+import { FlowContextManager } from '../flows/core'
+import { ICacheManager } from '../cache/interfaces/ICacheManager'
+import { SupabaseIntegration } from '../actions/supabase-integration'
+import { PrismaConversacionRepository } from '../repositories/PrismaConversacionRepository'
+import { IntentDetectorService } from './intent-detector'
+
 export class ChatServiceV2 {
   private stateService: StateService
   private prospectService: ProspectService
@@ -25,6 +35,15 @@ export class ChatServiceV2 {
   private flowHandler: FlowHandler
   private prospectoActualRepo: IProspectoActualRepository
   private prospectoHistorialRepo: IProspectoHistorialRepository
+  
+  // 🎪 ProspectCapture V2 con FlowContext
+  private prospectCaptureFlow: ProspectCaptureFlow
+  private advisorRequestFlow: AdvisorRequestFlow
+  private mainMenuFlow: MainMenuFlow
+  private flowContextManager: FlowContextManager
+  private supabaseIntegration: SupabaseIntegration
+  private conversacionRepo: PrismaConversacionRepository
+  private intentDetector: IntentDetectorService
 
   constructor(
     stateService: StateService,
@@ -35,7 +54,10 @@ export class ChatServiceV2 {
     messageFormatter: MessageFormatterService,
     flowHandler: FlowHandler,
     prospectoActualRepo: IProspectoActualRepository,
-    prospectoHistorialRepo: IProspectoHistorialRepository
+    prospectoHistorialRepo: IProspectoHistorialRepository,
+    cacheManager: ICacheManager | null,
+    webhookUrl: string,
+    webhookSecret: string
   ) {
     this.stateService = stateService
     this.prospectService = prospectService
@@ -46,75 +68,148 @@ export class ChatServiceV2 {
     this.flowHandler = flowHandler
     this.prospectoActualRepo = prospectoActualRepo
     this.prospectoHistorialRepo = prospectoHistorialRepo
-
-    console.log('🎭 [CHAT-SERVICE-V2] Inicializado con Repository Pattern')
+    
+    // 💬 Inicializar SupabaseIntegration para conversaciones/mensajes
+    this.supabaseIntegration = new SupabaseIntegration(webhookUrl, webhookSecret)
+    
+    // 💬 Inicializar PrismaConversacionRepository para conversaciones/mensajes directas
+    this.conversacionRepo = new PrismaConversacionRepository()
+    
+    // 🎪 Inicializar FlowContext System
+    this.flowContextManager = new FlowContextManager(cacheManager, prospectoActualRepo)
+    this.prospectCaptureFlow = new ProspectCaptureFlow(
+      this.flowContextManager,
+      this.validationService,
+      this.messageFormatter,
+      this.prospectServiceV2
+    )
+    
+    // 🎓 Inicializar AdvisorRequestFlow
+    this.advisorRequestFlow = new AdvisorRequestFlow(
+      this.flowContextManager,
+      this.validationService,
+      this.messageFormatter,
+      this.prospectServiceV2
+    )
+    
+    // 🏠 Inicializar MainMenuFlow
+    this.mainMenuFlow = new MainMenuFlow(
+      this.flowContextManager,
+      this.validationService,
+      this.messageFormatter,
+      this.prospectServiceV2
+    )
+    
+    // 🎯 Inicializar IntentDetector
+    this.intentDetector = new IntentDetectorService()
+    
+    console.log('🎭 [CHAT-SERVICE-V2] Inicializado con Repository Pattern + FlowContext')
   }
 
   /**
-   * 🎯 Método principal para procesar mensajes (mejorado con Repository)
+   * 🔍 Obtener contexto del usuario para detección de intenciones
+   */
+  private async getUserContext(userId: string): Promise<any> {
+    try {
+      // Verificar si existe un prospecto en la base de datos
+      const prospecto = await this.prospectoActualRepo.findByWhatsapp(userId)
+      
+      return {
+        hasCompletedCapture: !!prospecto,
+        nombre: prospecto?.nombre,
+        telefono_confirmado: prospecto?.telefono_confirmado,
+        ultimo_contacto: prospecto?.ultimo_contacto
+      }
+    } catch (error) {
+      console.warn(`⚠️ [${userId}] Error obteniendo contexto de usuario:`, error)
+      return { hasCompletedCapture: false }
+    }
+  }
+
+  /**
+   * 🎯 Método principal para procesar mensajes (mejorado con Repository + FlowContext)
    */
   async processMessage(userId: string, message: string): Promise<string> {
     try {
-      const state = this.stateService.getState(userId)
       const cleanMessage = message.trim()
+      console.log(`🤖 [${userId}] Procesando: "${cleanMessage}" con FlowContext V2`)
 
-      console.log(`🤖 [${userId}] Procesando: "${cleanMessage}" | Estado: ${state.flujo_actual}/${state.paso_actual}`)
-
-      // 1. 🔍 Reconocimiento usando ProspectServiceV2 (PRIMERO)
-      const recognition = await this.prospectServiceV2.reconocerProspecto(userId)
+      // 🔍 Verificar si el usuario ya completó captura inicial
+      const userContext = await this.getUserContext(userId)
       
-      // 🔄 Actualizar última interacción solo si el prospecto existe
-      if (recognition.success && recognition.data) {
-        try {
-          await this.prospectoActualRepo.updateLastInteraction(userId)
-        } catch (error) {
-          console.warn(`⚠️ [${userId}] No se pudo actualizar última interacción (prospecto nuevo)`)
-        }
+      // 🏠 Verificar si hay un context activo de MainMenu
+      const activeMainMenuContext = await this.flowContextManager.getActiveContext(userId)
+      const isInMainMenu = activeMainMenuContext && activeMainMenuContext.currentFlow === 'main-menu'
+      
+      // 🎯 DETECTAR INTENCIÓN para elegir flujo
+      const intent = this.intentDetector.detectIntent(cleanMessage, userContext)
+      console.log(`🎯 [${userId}] Intención detectada:`, intent, `| MainMenu activo: ${isInMainMenu}`)
+
+      // 🎪 Elegir flujo basado en intención Y contexto activo
+      let flowResult: any
+      
+      if (isInMainMenu) {
+        // 🏠 Si está en MainMenu, seguir con MainMenu
+        flowResult = await this.mainMenuFlow.processMessage(userId, cleanMessage)
+      } else if (intent.flow === 'main-menu' && intent.confidence > 0.8) {
+        // 🏠 Usar MainMenuFlow  
+        flowResult = await this.mainMenuFlow.processMessage(userId, cleanMessage)
+      } else if (intent.flow === 'advisor-request' && intent.confidence > 0.8) {
+        // 🎓 Usar AdvisorRequestFlow
+        flowResult = await this.advisorRequestFlow.processMessage(userId, cleanMessage)
+      } else {
+        // 🎪 Usar ProspectCaptureFlow por defecto
+        flowResult = await this.prospectCaptureFlow.processMessage(userId, cleanMessage)
       }
       
-      if (!recognition.success) {
-        console.error(`❌ [${userId}] Error en reconocimiento:`, recognition.error)
-        return this.messageFormatter.formatErrorMessage()
-      }
-
-      // 2. 🎯 Procesar con FlowHandler usando contexto mejorado
-      const flowContext: FlowContext = {
-        userId,
-        message: cleanMessage,
-        currentStep: (state.paso_actual as STEP_TYPES) || STEP_TYPES.GREETING,
-        currentFlow: (state.flujo_actual as FLOW_TYPES) || FLOW_TYPES.WELCOME,
-        userState: state,
-        sessionData: {
-          isReturning: recognition.isReturning || false,
-          sessionCount: recognition.sessionCount || 0,
-          prospectData: recognition.data || null,
-          fromHistory: recognition.fromHistory || false,
-          processingTime: Date.now()
-        }
-      }
-
-      const flowResult = await this.flowHandler.processFlow(flowContext)
-
-      // 3. 💾 Guardar cambios usando Repository si es necesario
-      if (flowResult.shouldSave && flowResult.metadata?.prospectData) {
-        const saveResult = await this.prospectServiceV2.guardarProspecto(userId, flowResult.metadata.prospectData)
+      if (flowResult.success) {
+        console.log(`✅ [${userId}] FlowContext procesado exitosamente`)
         
-        if (saveResult.success) {
-          console.log(`💾 [${userId}] Prospecto guardado via Repository`)
-        } else {
-          console.error(`❌ [${userId}] Error guardando prospecto:`, saveResult.error)
+        // 💬 Registrar interacción en conversaciones/mensajes usando Prisma
+        try {
+          await this.conversacionRepo.registrarInteraccion(userId, cleanMessage, flowResult.message)
+          console.log(`💬 [${userId}] Interacción registrada en conversaciones/mensajes`)
+        } catch (interactionError) {
+          console.warn(`⚠️ [${userId}] Error registrando interacción:`, interactionError)
+          // No fallar el flujo por error de registro
         }
+        
+        // 🔄 Si el flujo está completo, procesar siguiente flujo O limpiar sesión
+        if (flowResult.completed) {
+          if (flowResult.nextFlow === 'main-menu') {
+            console.log(`🎯 [${userId}] Flujo completado, ejecutando MainMenuFlow`)
+            try {
+              // 🏠 Ejecutar MainMenuFlow automáticamente 
+              const mainMenuResult = await this.mainMenuFlow.processMessage(userId, "menu")
+              console.log(`🏠 [${userId}] MainMenu activado exitosamente`)
+              
+              // Registrar interacción del menú
+              await this.conversacionRepo.registrarInteraccion(userId, "menu", mainMenuResult.message)
+              
+              // Devolver mensaje del MainMenu en lugar del mensaje de completion
+              return mainMenuResult.message
+            } catch (menuError) {
+              console.error(`❌ [${userId}] Error activando MainMenu:`, menuError)
+              // Fallback al mensaje original
+            }
+          } else if (flowResult.nextFlow === undefined) {
+            // 🔚 Sesión completada sin siguiente flujo (ej: handoff a asesor)
+            console.log(`🔚 [${userId}] Sesión completada y finalizada`)
+            try {
+              // Limpiar contexto activo para permitir nueva sesión
+              await this.flowContextManager.deactivateContext(userId)
+              console.log(`🧹 [${userId}] Contexto limpiado para nueva sesión`)
+            } catch (cleanupError) {
+              console.warn(`⚠️ [${userId}] Error limpiando contexto:`, cleanupError)
+            }
+          }
+        }
+        
+        return flowResult.message
+      } else {
+        console.error(`❌ [${userId}] Error en FlowContext:`, flowResult.message)
+        return flowResult.message || this.messageFormatter.formatErrorMessage()
       }
-
-      // 4. 🔄 Actualizar estado si cambió
-      if (flowResult.nextFlow || flowResult.nextStep) {
-        const newState = { ...state }
-        if (flowResult.nextFlow) newState.flujo_actual = flowResult.nextFlow
-        if (flowResult.nextStep) newState.paso_actual = flowResult.nextStep
-        this.stateService.setState(userId, newState)
-      }
-
-      return flowResult.response || this.messageFormatter.formatErrorMessage()
 
     } catch (error) {
       console.error(`💥 [${userId}] Error crítico en ChatServiceV2:`, error)

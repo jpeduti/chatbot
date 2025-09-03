@@ -381,6 +381,7 @@
                 <h3>🛠️ Acciones</h3>
                 <button class="clear-btn" onclick="clearChat()">🗑️ Limpiar Chat</button>
                 <button class="clear-btn" onclick="clearCache()" style="background: #ffc107; margin-top: 5px;">🧹 Limpiar Cache</button>
+                <button class="clear-btn" onclick="openVueChat()" style="background: #10b981; margin-top: 5px;">✨ Chat Vue.js</button>
             </div>
 
             <div>
@@ -711,6 +712,11 @@
         function sendQuickTest(message) {
             document.getElementById('messageInput').value = message;
             sendMessage();
+        }
+
+        function openVueChat() {
+            // Abrir la nueva interfaz Vue en una nueva ventana
+            window.open('/vue-chat-demo.html', '_blank', 'width=1200,height=800');
         }
     </script>
 </body>

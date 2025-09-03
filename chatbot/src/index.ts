@@ -11,7 +11,7 @@ import path from 'path'
 import { createChatRoutes, CHAT_ENDPOINTS_DOCS } from './controllers/chat-routes'
 import { WhatsAppSender } from './utils/whatsapp-sender'
 import { SupabaseIntegration } from './actions/supabase-integration'
-import { createChatBotServices } from './services/service-factory'
+import { createChatBotServices, configureCacheAndRecreateServices } from './services/service-factory'
 import logger from './utils/enhanced-logger'
 import { createDevelopmentCache, getAllCacheMetrics } from './cache'
 import { ChatServiceSelector } from './services/chat-service-selector'
@@ -55,7 +55,13 @@ app.use(cors({
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true }))
 
-// 📁 Servir archivos estáticos para chat-demo
+// 📁 Servir archivos estáticos directamente desde la raíz (para vue-chat-demo.html, etc.)
+app.use(express.static(path.join(__dirname, '../public')))
+
+// 📁 Servir la aplicación Vue construida
+app.use('/vue-chat', express.static(path.join(__dirname, '../public/vue-chat')))
+
+// 📁 Servir archivos estáticos para chat-demo (legacy compatibility)
 app.use('/public', express.static(path.join(__dirname, '../public')))
 
 // 🏭 Inicializar servicios
@@ -74,6 +80,13 @@ async function initializeCache() {
   try {
     cacheManager = await createDevelopmentCache()
     console.log('✅ [SERVER] Sistema de caché inicializado')
+    
+    // 🔄 Reconfigurar servicios con cache
+    console.log('🔄 [SERVER] Reconfigurando servicios con cache...')
+    const servicesWithCache = configureCacheAndRecreateServices(cacheManager, webhookUrl, webhookSecret)
+    Object.assign(services, servicesWithCache)
+    console.log('✅ [SERVER] Servicios actualizados con cache')
+    
   } catch (error) {
     console.warn('⚠️ [SERVER] Cache no disponible, usando fallback:', error)
   }

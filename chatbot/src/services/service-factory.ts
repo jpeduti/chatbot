@@ -14,10 +14,14 @@ import { ChatService } from './chat-service'
 import { ChatServiceV2 } from './chat-service-v2'
 import { repositoryFactory, RepositoryFactory } from '../repositories/RepositoryFactory'
 import { IProspectoActualRepository, IProspectoHistorialRepository } from '../repositories/interfaces/IProspectoRepository'
+import { ICacheManager } from '../cache/interfaces/ICacheManager'
 
 export class ServiceFactory {
   private static instance: ServiceFactory
   private services: Map<string, any> = new Map()
+  private cacheManager: ICacheManager | null = null
+  private webhookUrl: string = ''
+  private webhookSecret: string = ''
 
   private constructor() {}
 
@@ -29,6 +33,25 @@ export class ServiceFactory {
       ServiceFactory.instance = new ServiceFactory()
     }
     return ServiceFactory.instance
+  }
+
+  /**
+   * 🏗️ Configurar cache manager
+   */
+  setCacheManager(cacheManager: ICacheManager | null): void {
+    this.cacheManager = cacheManager
+  }
+
+  /**
+   * 🔧 Configurar webhook credentials
+   */
+  setWebhookCredentials(webhookUrl: string, webhookSecret: string): void {
+    this.webhookUrl = webhookUrl
+    this.webhookSecret = webhookSecret
+    
+    // 🔄 Limpiar ChatServiceV2 para recrearlo con las nuevas credenciales
+    this.services.delete('chatServiceV2')
+    console.log('🔄 [SERVICE-FACTORY] Webhook credentials configuradas')
   }
 
   /**
@@ -95,7 +118,7 @@ export class ServiceFactory {
       )
     )
     
-    // 5.5. Crear ChatServiceV2 (orchestrator con Repository)
+    // 5.5. Crear ChatServiceV2 (orchestrator con Repository + FlowContext)
     const chatServiceV2 = this.getOrCreate('chatServiceV2', () =>
       new ChatServiceV2(
         stateService,
@@ -106,7 +129,10 @@ export class ServiceFactory {
         messageFormatter,
         flowHandler,
         prospectoActualRepo,
-        prospectoHistorialRepo
+        prospectoHistorialRepo,
+        this.cacheManager,
+        this.webhookUrl,
+        this.webhookSecret
       )
     )
 
@@ -189,6 +215,16 @@ export class ServiceFactory {
  */
 export function createChatBotServices(webhookUrl: string, webhookSecret: string) {
   const factory = ServiceFactory.getInstance()
+  return factory.createServices(webhookUrl, webhookSecret)
+}
+
+/**
+ * 💾 Helper function para configurar cache y servicios
+ */
+export function configureCacheAndRecreateServices(cacheManager: ICacheManager | null, webhookUrl: string, webhookSecret: string) {
+  const factory = ServiceFactory.getInstance()
+  factory.setCacheManager(cacheManager)
+  factory.setWebhookCredentials(webhookUrl, webhookSecret)
   return factory.createServices(webhookUrl, webhookSecret)
 }
 
