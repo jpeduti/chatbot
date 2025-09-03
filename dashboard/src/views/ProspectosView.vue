@@ -136,8 +136,25 @@
                   <div class="text-sm text-gray-500">{{ prospecto.email }}</div>
                 </div>
               </td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                {{ formatTipoConsulta((prospecto as any).tipo_consulta_actual || (prospecto as any).tipo_consulta) }}
+              <td class="px-6 py-4 whitespace-nowrap">
+                <div class="flex items-center space-x-2">
+                  <!-- Ícono de baliza para Solicitud Asesor -->
+                  <div v-if="isSolicitudAsesor((prospecto as any).tipo_consulta_actual || (prospecto as any).tipo_consulta)" 
+                       class="flex items-center">
+                    <svg class="w-4 h-4 text-red-600 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
+                      <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                    </svg>
+                  </div>
+                  <!-- Texto del tipo de consulta con color especial para Solicitud Asesor -->
+                  <span :class="[
+                    'text-sm font-medium',
+                    isSolicitudAsesor((prospecto as any).tipo_consulta_actual || (prospecto as any).tipo_consulta) 
+                      ? 'text-red-600 font-bold' 
+                      : 'text-gray-900'
+                  ]">
+                    {{ formatTipoConsulta((prospecto as any).tipo_consulta_actual || (prospecto as any).tipo_consulta) }}
+                  </span>
+                </div>
               </td>
               <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                 {{ prospecto.carrera_interes || 'No especificada' }}
@@ -611,7 +628,7 @@ const guardarDatosProspecto = async (datosActualizados: any) => {
       console.log('✅ Prospecto actualizado exitosamente')
       
       // Recargar la lista de prospectos
-      await cargarProspectos()
+      await prospectosStore.refreshData()
       
       // Cerrar modal de edición
       cerrarModalEdicion()
@@ -632,7 +649,7 @@ const prospectoActualizado = async (prospectoActualizado: any) => {
   
   try {
     // Recargar la lista de prospectos para reflejar los cambios
-    await cargarProspectos()
+    await prospectosStore.refreshData()
     
     // Actualizar el prospecto seleccionado con los nuevos datos
     selectedProspecto.value = prospectoActualizado
@@ -671,6 +688,25 @@ const handleDelete = async (id: string) => {
   if (confirm('¿Estás seguro de que deseas eliminar este prospecto?')) {
     await prospectosStore.removeProspecto(id)
   }
+}
+
+// 🚨 FUNCIÓN PARA DETECTAR SOLICITUD DE ASESOR
+const isSolicitudAsesor = (tipoConsulta: string): boolean => {
+  if (!tipoConsulta) return false
+  
+  const solicitudAsesorTypes = [
+    'solicitar_asesor',
+    'solicitud_asesor', 
+    'solicitud de asesor',
+    'hablar_asesor',
+    'contacto_asesor',
+    'captura_datos'
+  ]
+  
+  return solicitudAsesorTypes.some(type => 
+    tipoConsulta.toLowerCase().includes(type) || 
+    tipoConsulta.toLowerCase() === type
+  )
 }
 
 const getStatusColor = (estado: string) => {

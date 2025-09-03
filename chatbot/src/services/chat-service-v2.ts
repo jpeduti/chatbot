@@ -272,6 +272,12 @@ export class ChatServiceV2 {
             // 🔚 Sesión completada sin siguiente flujo (ej: handoff a asesor)
             console.log(`🔚 [${userId}] Sesión completada y finalizada`)
             try {
+              // 🛑 CANCELAR TIMEOUTS PROGRAMADOS - La sesión está completa exitosamente
+              console.log(`🛑 [${userId}] Cancelando timeouts programados...`)
+              this.stateService.clearTimeouts(userId)
+              this.timeoutService.clearPendingMessages(userId)
+              console.log(`✅ [${userId}] Timeouts cancelados - sesión completada exitosamente`)
+              
               // Limpiar contexto activo para permitir nueva sesión
               await this.flowContextManager.deactivateContext(userId)
               console.log(`🧹 [${userId}] Contexto limpiado para nueva sesión`)
@@ -848,6 +854,12 @@ export class ChatServiceV2 {
           // 🔚 Sesión completada sin siguiente flujo (ej: handoff a asesor)
           console.log(`🔚 [${userId}] Sesión completada y finalizada`)
           try {
+            // 🛑 CANCELAR TIMEOUTS PROGRAMADOS - La sesión está completa exitosamente
+            console.log(`🛑 [${userId}] Cancelando timeouts programados...`)
+            this.stateService.clearTimeouts(userId)
+            this.timeoutService.clearPendingMessages(userId)
+            console.log(`✅ [${userId}] Timeouts cancelados - sesión completada exitosamente`)
+            
             // Limpiar contexto activo para permitir nueva sesión
             await this.flowContextManager.deactivateContext(userId)
             console.log(`🧹 [${userId}] Contexto limpiado para nueva sesión`)

@@ -109,6 +109,15 @@ export class StateService {
   }
 
   /**
+   * 🧹 Limpiar mensajes pendientes específicamente (sin retornar)
+   */
+  clearPendingMessages(userId: string): void {
+    const hadMessage = this.mensajesPendientes.has(userId)
+    this.mensajesPendientes.delete(userId)
+    console.log(`🧹 [STATE-SERVICE] Mensajes pendientes limpiados para ${userId}: ${hadMessage ? 'había mensaje' : 'no había mensaje'}`)
+  }
+
+  /**
    * 🔧 Helpers privados
    */
   private createInitialState(): UserState {
