@@ -19,6 +19,7 @@ import { detectPhoneFromUserId, generatePhoneConfirmationMessage } from '../util
 import { ProspectCaptureFlow } from '../flows/prospect-capture'
 import { AdvisorRequestFlow } from '../flows/advisor-request'
 import { MainMenuFlow } from '../flows/main-menu'
+import { ReturningUserFlow } from '../flows/returning-user/ReturningUserFlow'
 import { FlowContextManager } from '../flows/core'
 import { ICacheManager } from '../cache/interfaces/ICacheManager'
 import { SupabaseIntegration } from '../actions/supabase-integration'
@@ -40,6 +41,7 @@ export class ChatServiceV2 {
   private prospectCaptureFlow: ProspectCaptureFlow
   private advisorRequestFlow: AdvisorRequestFlow
   private mainMenuFlow: MainMenuFlow
+  private returningUserFlow: ReturningUserFlow
   private flowContextManager: FlowContextManager
   private supabaseIntegration: SupabaseIntegration
   private conversacionRepo: PrismaConversacionRepository
@@ -103,6 +105,14 @@ export class ChatServiceV2 {
       this.prospectServiceV2
     )
     
+    // 🔄 Inicializar ReturningUserFlow
+    this.returningUserFlow = new ReturningUserFlow(
+      this.flowContextManager,
+      this.validationService,
+      this.messageFormatter,
+      this.prospectServiceV2
+    )
+    
     // 🎯 Inicializar IntentDetector
     this.intentDetector = new IntentDetectorService()
     
@@ -138,49 +148,94 @@ export class ChatServiceV2 {
       console.log(`🤖 [${userId}] Procesando: "${cleanMessage}" con FlowContext V2`)
       console.log(`🔗 [${userId}] TimeoutService configurado con FlowContextManager: ${this.timeoutService.isFlowContextManagerConfigured()}`)
 
-      // ⏰ VERIFICAR MENSAJES PENDIENTES DE TIMEOUT primero
-      const pendingWarning = this.timeoutService.getPendingWarningMessage(userId)
-      const pendingTimeout = this.timeoutService.getPendingTimeoutMessage(userId)
-      
-      if (pendingTimeout) {
-        console.log(`⏰ [${userId}] Entregando mensaje de timeout pendiente`)
-        return pendingTimeout
+      // 🔄 DETECTAR USUARIO RECURRENTE PRIMERO - ANTES de timeouts
+      const returningUserCheck = await this.checkReturningUser(userId, cleanMessage)
+      if (returningUserCheck.shouldUseReturningFlow) {
+        console.log(`🔄 [${userId}] Usuario recurrente detectado - OMITIENDO verificación de timeouts`)
+        console.log(`💭 [${userId}] ReturningUserFlow manejará experiencia directamente`)
+        
+        // ⏰ LIMPIAR cualquier timeout pendiente para usuarios recurrentes
+        // this.timeoutService.clearPendingMessages(userId) // TODO: Implementar después
+        console.log(`🧹 [${userId}] Timeouts pendientes omitidos para ReturningUser`)
+        
+        const flowResult = await this.returningUserFlow.processMessage(userId, cleanMessage)
+        return await this.handleFlowResult(userId, cleanMessage, flowResult, undefined)
       }
-      
-      if (pendingWarning) {
-        console.log(`⚠️ [${userId}] Entregando mensaje de warning pendiente`)
-        // Continuar con el procesamiento normal después del warning
-      }
-
-      // ⏰ CONFIGURAR TIMEOUT para esta sesión (usar V1 por ahora)
-      this.timeoutService.setSessionTimeout(userId)
 
       // 🔍 Verificar si el usuario ya completó captura inicial
       const userContext = await this.getUserContext(userId)
       
-      // 🏠 Verificar si hay un context activo de MainMenu
-      const activeMainMenuContext = await this.flowContextManager.getActiveContext(userId)
-      const isInMainMenu = activeMainMenuContext && activeMainMenuContext.currentFlow === 'main-menu'
-      
-      // 🎯 DETECTAR INTENCIÓN para elegir flujo
-      const intent = this.intentDetector.detectIntent(cleanMessage, userContext)
-      console.log(`🎯 [${userId}] Intención detectada:`, intent, `| MainMenu activo: ${isInMainMenu}`)
+      // 🔄 VERIFICAR SI YA ESTÁ EN UN FLUJO ACTIVO (ANTES de verificar timeouts)
+      const activeContext = await this.flowContextManager.getActiveContext(userId)
+      const isInReturningUserFlow = activeContext && activeContext.currentFlow === 'returning-user'
+      const isInMainMenu = activeContext && activeContext.currentFlow === 'main-menu'
+      const hasActiveFlow = isInReturningUserFlow || isInMainMenu
 
-      // 🎪 Elegir flujo basado en intención Y contexto activo
+      // ⏰ VERIFICAR MENSAJES PENDIENTES DE TIMEOUT (considerar flujos activos)
+      console.log(`\n⏰ [${userId}] ===== VERIFICANDO TIMEOUTS PENDIENTES =====`)
+      const pendingWarning = this.timeoutService.getPendingWarningMessage(userId)
+      const pendingTimeout = this.timeoutService.getPendingTimeoutMessage(userId)
+      
+      console.log(`📊 [${userId}] Estado timeout:`, {
+        hasPendingWarning: !!pendingWarning,
+        hasPendingTimeout: !!pendingTimeout,
+        hasActiveFlow: !!(activeContext && activeContext.isActive),
+        activeFlowType: activeContext?.currentFlow,
+        warningPreview: pendingWarning ? pendingWarning.substring(0, 50) + '...' : null,
+        timeoutPreview: pendingTimeout ? pendingTimeout.substring(0, 50) + '...' : null
+      })
+      
+      if (pendingTimeout && (!activeContext || !activeContext.isActive)) {
+        console.log(`⏰ [${userId}] ENTREGANDO TIMEOUT PENDIENTE - fin de flujo`)
+        console.log(`📤 [${userId}] Mensaje timeout: "${pendingTimeout}"`)
+        return pendingTimeout
+      } else if (pendingTimeout && activeContext && activeContext.isActive) {
+        console.log(`🔄 [${userId}] TIMEOUT PENDIENTE OMITIDO - usuario tiene flujo activo (${activeContext.currentFlow})`)
+        console.log(`🧹 [${userId}] Limpiando timeout pendiente para continuar flujo activo`)
+        // El usuario está activo en un flujo, omitir timeout y continuar
+      }
+      
+      if (pendingWarning) {
+        console.log(`⚠️ [${userId}] WARNING PENDIENTE detectado - continuará procesamiento`)
+        console.log(`📤 [${userId}] Warning detectado: "${pendingWarning.substring(0, 100)}..."`)
+        // Continuar con el procesamiento normal después del warning
+      } else {
+        console.log(`✅ [${userId}] No hay warnings pendientes`)
+      }
+      console.log(`⏰ [${userId}] ===== FIN VERIFICACIÓN TIMEOUTS =====\n`)
+
+      // ⏰ CONFIGURAR TIMEOUT para esta sesión (usar V1 por ahora)
+      this.timeoutService.setSessionTimeout(userId)
+      
+      console.log(`🔍 [${userId}] Context activo encontrado en memoria`)
+      console.log(`📊 [${userId}] Flujos activos: { returningUser: ${isInReturningUserFlow}, mainMenu: ${isInMainMenu} }`)
+      
+      // 🎪 Elegir flujo basado en contexto activo
       let flowResult: any
       
-      if (isInMainMenu) {
+      if (isInReturningUserFlow) {
+        // 🔄 Si está en ReturningUserFlow, MANTENER en ReturningUserFlow
+        console.log(`🔄 [${userId}] Manteniendo en ReturningUserFlow (step: ${activeContext.currentStep})`)
+        flowResult = await this.returningUserFlow.processMessage(userId, cleanMessage)
+      } else if (isInMainMenu) {
         // 🏠 Si está en MainMenu, seguir con MainMenu
+        console.log(`🏠 [${userId}] Manteniendo en MainMenuFlow`)
         flowResult = await this.mainMenuFlow.processMessage(userId, cleanMessage)
-      } else if (intent.flow === 'main-menu' && intent.confidence > 0.8) {
-        // 🏠 Usar MainMenuFlow  
-        flowResult = await this.mainMenuFlow.processMessage(userId, cleanMessage)
-      } else if (intent.flow === 'advisor-request' && intent.confidence > 0.8) {
-        // 🎓 Usar AdvisorRequestFlow
-        flowResult = await this.advisorRequestFlow.processMessage(userId, cleanMessage)
       } else {
-        // 🎪 Usar ProspectCaptureFlow por defecto
-        flowResult = await this.prospectCaptureFlow.processMessage(userId, cleanMessage)
+        // 🎯 DETECTAR INTENCIÓN para elegir flujo (solo si no hay context activo)
+        const intent = this.intentDetector.detectIntent(cleanMessage, userContext)
+        console.log(`🎯 [${userId}] Intención detectada:`, intent, `| MainMenu activo: ${isInMainMenu}`)
+        
+        if (intent.flow === 'main-menu' && intent.confidence > 0.8) {
+          // 🏠 Usar MainMenuFlow  
+          flowResult = await this.mainMenuFlow.processMessage(userId, cleanMessage)
+        } else if (intent.flow === 'advisor-request' && intent.confidence > 0.8) {
+          // 🎓 Usar AdvisorRequestFlow
+          flowResult = await this.advisorRequestFlow.processMessage(userId, cleanMessage)
+        } else {
+          // 🎪 Usar ProspectCaptureFlow por defecto
+          flowResult = await this.prospectCaptureFlow.processMessage(userId, cleanMessage)
+        }
       }
       
       if (flowResult.success) {
@@ -519,6 +574,299 @@ export class ChatServiceV2 {
         prospectMigrated: false,
         sessionInitialized: false
       }
+    }
+  }
+
+  /**
+   * 🔄 Verificar si el usuario es recurrente y debe usar ReturningUserFlow
+   */
+  private async checkReturningUser(userId: string, message: string): Promise<{
+    shouldUseReturningFlow: boolean
+    prospectData?: any
+    reason?: string
+  }> {
+    try {
+      console.log(`\n🔄 [CHAT-SERVICE-V2] ===== CHECK RETURNING USER =====`)
+      console.log(`📱 [${userId}] Input: "${message}"`)
+      console.log(`⏰ [${userId}] Timestamp: ${new Date().toISOString()}`)
+
+      // 1. 🔍 Solo procesar si es un mensaje de inicio (hola, saludo, etc.)
+      const isGreeting = this.isGreetingMessage(message)
+      console.log(`🔍 [${userId}] Análisis saludo:`, {
+        message: message,
+        isGreeting: isGreeting,
+        messageLength: message.length
+      })
+      
+      if (!isGreeting) {
+        console.log(`❌ [${userId}] No es saludo - saltando ReturningUser check`)
+        return { 
+          shouldUseReturningFlow: false, 
+          reason: 'No es un mensaje de saludo inicial' 
+        }
+      }
+
+      // 2. 🔍 Verificar si ya hay un contexto activo de ReturningUser
+      console.log(`🔍 [${userId}] Verificando contexto activo...`)
+      const activeContext = await this.flowContextManager.getActiveContext(userId)
+      console.log(`📊 [${userId}] Contexto activo:`, {
+        exists: !!activeContext,
+        currentFlow: activeContext?.currentFlow,
+        isActive: activeContext?.isActive,
+        currentStep: activeContext?.currentStep
+      })
+      
+      if (activeContext && activeContext.currentFlow === 'returning-user') {
+        console.log(`✅ [${userId}] Ya está en ReturningUser flow`)
+        return { 
+          shouldUseReturningFlow: true, 
+          reason: 'Ya está en flujo de usuario recurrente' 
+        }
+      }
+
+      // 3. 🔍 Buscar prospecto en base de datos
+      console.log(`\n💾 [${userId}] ===== CONSULTANDO BD PARA RETURNING USER =====`)
+      console.log(`📞 [${userId}] Buscando prospecto: "${userId}"`)
+      console.log(`⏰ [${userId}] Timestamp consulta: ${new Date().toISOString()}`)
+      
+      let prospectResult
+      try {
+        prospectResult = await this.prospectServiceV2.reconocerProspecto(userId)
+        console.log(`✅ [${userId}] Consulta BD exitosa para ReturningUser`)
+      } catch (dbError) {
+        console.error(`💥 [${userId}] ERROR BD en ReturningUser check:`)
+        console.error(`📋 [${userId}] Error detalles:`, {
+          name: dbError instanceof Error ? dbError.name : 'Unknown',
+          message: dbError instanceof Error ? dbError.message : String(dbError)
+        })
+        throw dbError
+      }
+      
+      console.log(`📊 [${userId}] ===== RESPUESTA BD RETURNING USER =====`)
+      console.log(`🔍 [${userId}] Resultado reconocimiento COMPLETO:`, prospectResult)
+      console.log(`📋 [${userId}] Análisis respuesta:`, {
+        isReturning: prospectResult.isReturning,
+        success: prospectResult.success,
+        sessionCount: prospectResult.sessionCount,
+        fromHistory: prospectResult.fromHistory,
+        hasData: !!prospectResult.data
+      })
+      
+      if (prospectResult.data) {
+        console.log(`📋 [${userId}] Datos completos encontrados:`, prospectResult.data)
+        console.log(`📊 [${userId}] Campos clave:`, {
+          nombre: prospectResult.data.nombre || '[SIN NOMBRE]',
+          telefono: prospectResult.data.telefono || '[SIN TELEFONO]',
+          email: prospectResult.data.email || '[SIN EMAIL]',
+          dataFields: Object.keys(prospectResult.data)
+        })
+      } else {
+        console.log(`⚠️ [${userId}] No hay datos de prospecto en BD`)
+      }
+      
+      if (prospectResult.isReturning && prospectResult.data) {
+        // 4. 🎯 Verificar si aplica para Flujo 1 (solo teléfono, sin nombre o con nombre)
+        const hasPhone = !!prospectResult.data.telefono
+        const hasName = !!prospectResult.data.nombre
+        
+        console.log(`🎯 [${userId}] Análisis para Flujo 1:`, {
+          hasPhone: hasPhone,
+          hasName: hasName,
+          phoneValue: prospectResult.data.telefono,
+          nameValue: prospectResult.data.nombre,
+          sessionCount: prospectResult.sessionCount
+        })
+        
+        if (hasPhone) {
+          const flowType = hasName ? 'nombre' : 'solo teléfono'
+          console.log(`✅ [${userId}] ACTIVANDO RETURNING USER FLOW`)
+          console.log(`🎯 [${userId}] Tipo: Usuario recurrente con ${flowType}`)
+          
+          return {
+            shouldUseReturningFlow: true,
+            prospectData: prospectResult.data,
+            reason: `Usuario recurrente con ${flowType}`
+          }
+        } else {
+          console.log(`❌ [${userId}] Sin teléfono - no aplica ReturningUser`)
+        }
+      } else {
+        console.log(`❌ [${userId}] No es usuario recurrente o sin datos`)
+      }
+
+      return { 
+        shouldUseReturningFlow: false,
+        reason: 'Usuario nuevo o sin datos suficientes'
+      }
+
+    } catch (error) {
+      console.error(`❌ [${userId}] Error verificando usuario recurrente:`, error)
+      return { 
+        shouldUseReturningFlow: false,
+        reason: 'Error en verificación'
+      }
+    }
+  }
+
+  /**
+   * 🎯 Verificar si el mensaje es un saludo inicial (Clase Mundial)
+   */
+  private isGreetingMessage(message: string): boolean {
+    const cleanMessage = message.toLowerCase().trim()
+    
+    // 🌍 1. SALUDOS FORMALES E INFORMALES (Español)
+    const spanishGreetings = [
+      'hola', 'buenas', 'buenos días', 'buenas tardes', 'buenas noches',
+      'buen día', 'buenas', 'que tal', 'qué tal', 'como estas', 'cómo estás',
+      'saludos', 'muy buenas', 'holaa', 'holis', 'ola', 'holaaa'
+    ]
+    
+    // 🌎 2. SALUDOS INTERNACIONALES  
+    const internationalGreetings = [
+      'hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening',
+      'greetings', 'howdy', 'what\'s up', 'whats up', 'wassup'
+    ]
+    
+    // 📱 3. SALUDOS DIGITALES/GENERACIONALES
+    const digitalGreetings = [
+      'heyyy', 'heyy', 'hiiii', 'helloo', 'sup', 'yo',
+      'holiii', 'holiwis', 'holi', 'ke tal', 'q tal'
+    ]
+    
+    // 🔄 4. REINICIOS Y COMANDOS DE INICIO
+    const startCommands = [
+      'empezar', 'comenzar', 'iniciar', 'start', 'begin', 'menu',
+      'ayuda', 'help', 'info', 'información', 'inicio'
+    ]
+    
+    // 🎯 5. PATRONES DE CORTESÍA
+    const courtesyPatterns = [
+      'disculpe', 'disculpa', 'perdón', 'excuse me', 'sorry',
+      'por favor', 'please', 'gracias', 'thank you', 'thanks'
+    ]
+    
+    // 📞 6. ESPECÍFICOS DE ATENCIÓN AL CLIENTE
+    const servicePatterns = [
+      'necesito ayuda', 'quiero información', 'tengo una consulta',
+      'me pueden ayudar', 'quisiera saber', 'estoy interesado',
+      'i need help', 'i want information', 'can you help me'
+    ]
+    
+    // 🔍 Combinar todos los patrones
+    const allGreetings = [
+      ...spanishGreetings,
+      ...internationalGreetings, 
+      ...digitalGreetings,
+      ...startCommands,
+      ...courtesyPatterns,
+      ...servicePatterns
+    ]
+    
+    // 🎯 DETECCIÓN INTELIGENTE
+    
+    // Coincidencia exacta
+    if (allGreetings.includes(cleanMessage)) {
+      return true
+    }
+    
+    // Empieza con saludo + algo más
+    for (const greeting of allGreetings) {
+      if (cleanMessage.startsWith(greeting + ' ') || 
+          cleanMessage.startsWith(greeting + ',') ||
+          cleanMessage.startsWith(greeting + '!') ||
+          cleanMessage.startsWith(greeting + '.')) {
+        return true
+      }
+    }
+    
+    // Contiene saludo (más permisivo para frases naturales)
+    const naturalPhrases = [
+      'hola', 'hello', 'hi ', 'buenos días', 'buenas tardes', 
+      'buenas noches', 'ayuda', 'help', 'información'
+    ]
+    
+    for (const phrase of naturalPhrases) {
+      if (cleanMessage.includes(phrase)) {
+        return true
+      }
+    }
+    
+    // 🔢 Detección por longitud (mensajes muy cortos suelen ser saludos)
+    if (cleanMessage.length <= 3 && cleanMessage.match(/^[a-záéíóúñ]+$/i)) {
+      return true // "hi", "ola", etc.
+    }
+    
+    // 🎭 Detección de emojis de saludo
+    const greetingEmojis = ['👋', '🙋', '😊', '😄', '🙂', '😃', '👍']
+    if (greetingEmojis.some(emoji => message.includes(emoji))) {
+      return true
+    }
+    
+    return false
+  }
+
+  /**
+   * 🔄 Manejar resultado de flujo (extraído para reutilización)
+   */
+  private async handleFlowResult(
+    userId: string, 
+    message: string, 
+    flowResult: any, 
+    pendingWarning?: string
+  ): Promise<string> {
+    if (flowResult.success) {
+      console.log(`✅ [${userId}] FlowContext procesado exitosamente`)
+      
+      // 💬 Registrar interacción en conversaciones/mensajes usando Prisma
+      try {
+        await this.conversacionRepo.registrarInteraccion(userId, message, flowResult.message)
+        console.log(`💬 [${userId}] Interacción registrada en conversaciones/mensajes`)
+      } catch (interactionError) {
+        console.warn(`⚠️ [${userId}] Error registrando interacción:`, interactionError)
+        // No fallar el flujo por error de registro
+      }
+      
+      // 🔄 Si el flujo está completo, procesar siguiente flujo O limpiar sesión
+      if (flowResult.completed) {
+        if (flowResult.nextFlow === 'main-menu') {
+          console.log(`🎯 [${userId}] Flujo completado, ejecutando MainMenuFlow`)
+          try {
+            // 🏠 Ejecutar MainMenuFlow automáticamente 
+            const mainMenuResult = await this.mainMenuFlow.processMessage(userId, "menu")
+            console.log(`🏠 [${userId}] MainMenu activado exitosamente`)
+            
+            // Registrar interacción del menú
+            await this.conversacionRepo.registrarInteraccion(userId, "menu", mainMenuResult.message)
+            
+            // Devolver mensaje del MainMenu en lugar del mensaje de completion
+            return mainMenuResult.message
+          } catch (menuError) {
+            console.error(`❌ [${userId}] Error activando MainMenu:`, menuError)
+            // Fallback al mensaje original
+          }
+        } else if (flowResult.nextFlow === undefined) {
+          // 🔚 Sesión completada sin siguiente flujo (ej: handoff a asesor)
+          console.log(`🔚 [${userId}] Sesión completada y finalizada`)
+          try {
+            // Limpiar contexto activo para permitir nueva sesión
+            await this.flowContextManager.deactivateContext(userId)
+            console.log(`🧹 [${userId}] Contexto limpiado para nueva sesión`)
+          } catch (cleanupError) {
+            console.warn(`⚠️ [${userId}] Error limpiando contexto:`, cleanupError)
+          }
+        }
+      }
+      
+      // ⚠️ Incluir warning si existe
+      let finalMessage = flowResult.message
+      if (pendingWarning) {
+        finalMessage = `⚠️ ${pendingWarning}\n\n${flowResult.message}`
+      }
+      
+      return finalMessage
+    } else {
+      console.error(`❌ [${userId}] Error en FlowContext:`, flowResult.message)
+      return flowResult.message || this.messageFormatter.formatErrorMessage()
     }
   }
 }

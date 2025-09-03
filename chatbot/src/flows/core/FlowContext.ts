@@ -36,6 +36,10 @@ export interface CapturedProspectData {
   intereses?: any[]                   // Array de intereses capturados en menú
   menu_interactions?: number          // Número de interacciones con menú
   last_menu_option?: string           // Última opción seleccionada
+  
+  // 🔄 ReturningUser específicos
+  privacy_choice?: 'personalized' | 'anonymous'    // Elección de privacidad del usuario
+  menu_type?: 'personalized' | 'anonymous'         // Tipo de menú mostrado
 }
 
 // 🔧 Tipos de Preferencias de Contacto
@@ -164,7 +168,8 @@ export enum FlowType {
   CAMPUS_INFO = 'campus-info',
   ENROLLMENT_PROCESS = 'enrollment-process',
   COMPLAINT_HANDLING = 'complaint-handling',
-  MAIN_MENU = 'main-menu'
+  MAIN_MENU = 'main-menu',
+  RETURNING_USER = 'returning-user'
 }
 
 // 📋 Tipos de Pasos en ProspectCapture

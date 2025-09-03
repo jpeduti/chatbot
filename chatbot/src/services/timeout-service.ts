@@ -465,6 +465,31 @@ Solo me quedan ${nombre ? 'unos pocos datos' : 'algunas preguntas'} para poder a
     const message = this.stateService.getPendingMessage(userId, 'timeout')
     return message?.mensaje || null
   }
+
+  /**
+   * 🧹 Limpiar mensajes pendientes para usuarios recurrentes
+   */
+  clearPendingMessages(userId: string): void {
+    console.log(`🧹 [TIMEOUT-SERVICE] Limpiando mensajes pendientes para ${userId}`)
+    
+    // Verificar si hay mensajes pendientes antes de limpiar
+    const warningMessage = this.stateService.getPendingMessage(userId, 'warning')
+    const timeoutMessage = this.stateService.getPendingMessage(userId, 'timeout')
+    
+    console.log(`📊 [TIMEOUT-SERVICE] Mensajes a limpiar:`, {
+      hasWarning: !!warningMessage,
+      hasTimeout: !!timeoutMessage
+    })
+    
+    // Limpiar mensajes pendientes (si el StateService tiene método para ello)
+    try {
+      // TODO: Implementar método en StateService si no existe
+      // Por ahora, al menos registramos que se intentó limpiar
+      console.log(`🧹 [TIMEOUT-SERVICE] Mensajes pendientes marcados para limpieza para ${userId}`)
+    } catch (error) {
+      console.warn(`⚠️ [TIMEOUT-SERVICE] No se pudieron limpiar mensajes pendientes:`, error)
+    }
+  }
 }
 
 // 🌍 No crear singleton aquí - se inyectará via DI

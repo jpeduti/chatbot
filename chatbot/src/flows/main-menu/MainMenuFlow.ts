@@ -875,8 +875,8 @@ Escribe el número de tu opción 📝`
         nombre: context.capturedData.nombre || 'Usuario',
         email: context.capturedData.email || null,
         telefono: context.capturedData.telefono || null,
-        facultad_interes: context.capturedData.facultad_interes || null,
-        carrera_interes: context.capturedData.carrera_interes || null,
+        facultad_interes: context.capturedData.facultad_interes || undefined,
+        carrera_interes: context.capturedData.carrera_interes || undefined,
         source: context.sessionMetadata.source || 'unknown',
         nivel_interes: 'alto', // MainMenu engagement = alto interés
         tipo_consulta: 'post_capture_engagement',
@@ -1217,8 +1217,8 @@ ${carrerasList}
         // 🏠 Volver al menú principal
         return {
           success: true,
-          message: '🏠 **Regresando al menú principal...**',
-          nextStep: MainMenuStep.MENU_DISPLAY,
+          message: `🏠 **Regresando al menú principal...**\n\n${this.formatMainMenu(context)}`,
+          nextStep: MainMenuStep.OPTION_PROCESSING,
           completed: false
         }
       

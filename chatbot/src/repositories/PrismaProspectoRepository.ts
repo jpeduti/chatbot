@@ -29,16 +29,48 @@ export class PrismaProspectoActualRepository implements IProspectoActualReposito
   }
 
   async findByWhatsapp(whatsapp: string): Promise<prospecto_actual | null> {
-    const cacheKey = `prospecto:${whatsapp}`
+    console.log(`\n🔍 [REPO-DETAILED] ===== BÚSQUEDA DETALLADA =====`)
+    console.log(`📱 [REPO-DETAILED] Buscando whatsapp: "${whatsapp}"`)
+    console.log(`⏰ [REPO-DETAILED] Timestamp consulta: ${new Date().toISOString()}`)
+    console.log(`🏭 [REPO-DETAILED] Instancia Prisma: ${!!this.prisma}`)
     
-    // Check cache first
+    // 💾 CACHE CON LOGS DETALLADOS
+    const cacheKey = `prospecto:${whatsapp}`
+    console.log(`🔑 [REPO-DETAILED] CacheKey: "${cacheKey}"`)
+    console.log(`📊 [REPO-DETAILED] Cache size actual: ${this.cache.size}`)
+    console.log(`⏱️ [REPO-DETAILED] Cache TTL: ${this.CACHE_TTL}ms`)
+    
     const cached = this.cache.get(cacheKey)
-    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
-      console.log(`💾 [CACHE] Hit para prospecto ${whatsapp}`)
-      return cached.data
+    console.log(`💾 [REPO-DETAILED] Cache entry exists: ${!!cached}`)
+    
+    if (cached) {
+      const age = Date.now() - cached.timestamp
+      const isValid = age < this.CACHE_TTL
+      console.log(`💾 [REPO-DETAILED] Cache entry details:`, {
+        timestamp: new Date(cached.timestamp).toISOString(),
+        age: `${age}ms`,
+        isValid: isValid,
+        TTL: `${this.CACHE_TTL}ms`,
+        hasData: !!cached.data,
+        dataPreview: cached.data ? `${cached.data.whatsapp} - ${cached.data.nombre}` : 'null'
+      })
+      
+      if (isValid) {
+        console.log(`✅ [REPO-DETAILED] CACHE HIT - Retornando datos del cache`)
+        console.log(`💾 [CACHE] Hit para prospecto ${whatsapp}`)
+        return cached.data
+      } else {
+        console.log(`⏰ [REPO-DETAILED] CACHE EXPIRED - Eliminando entrada expirada`)
+        this.cache.delete(cacheKey)
+      }
+    } else {
+      console.log(`❌ [REPO-DETAILED] CACHE MISS - No hay entrada en cache`)
     }
 
     try {
+      console.log(`🚀 [REPO-DETAILED] Ejecutando query Prisma...`)
+      console.log(`📋 [REPO-DETAILED] Query: findUnique({ where: { whatsapp: "${whatsapp}" } })`)
+      
       const prospecto = await this.prisma.prospecto_actual.findUnique({
         where: { whatsapp },
         include: {
@@ -46,14 +78,49 @@ export class PrismaProspectoActualRepository implements IProspectoActualReposito
         }
       })
 
-      // Cache result
+      console.log(`📊 [REPO-DETAILED] ===== RESULTADO QUERY PRISMA =====`)
+      console.log(`✅ [REPO-DETAILED] Query ejecutada exitosamente`)
+      console.log(`📋 [REPO-DETAILED] Resultado encontrado: ${!!prospecto}`)
+      
       if (prospecto) {
-        this.cache.set(cacheKey, { data: prospecto, timestamp: Date.now() })
+        console.log(`👤 [REPO-DETAILED] Datos del prospecto encontrado:`)
+        console.log(`   - whatsapp: "${prospecto.whatsapp}"`)
+        console.log(`   - nombre: "${prospecto.nombre}"`)
+        console.log(`   - email: "${prospecto.email || '[SIN EMAIL]'}"`)
+        console.log(`   - telefono: "${prospecto.telefono || '[SIN TELEFONO]'}"`)
+        console.log(`   - created_at: ${prospecto.primera_interaccion}`)
+        console.log(`   - updated_at: ${prospecto.ultima_interaccion}`)
+        console.log(`   - total_sesiones: ${prospecto.total_sesiones}`)
+        
+        // 💾 CACHE UPDATE CON LOGS DETALLADOS
+        const cacheEntry = { data: prospecto, timestamp: Date.now() }
+        console.log(`💾 [REPO-DETAILED] Guardando en cache:`, {
+          cacheKey: cacheKey,
+          timestamp: new Date(cacheEntry.timestamp).toISOString(),
+          dataPreview: `${prospecto.whatsapp} - ${prospecto.nombre}`
+        })
+        
+        this.cache.set(cacheKey, cacheEntry)
+        console.log(`✅ [REPO-DETAILED] CACHE UPDATED - Entrada guardada exitosamente`)
+        console.log(`📊 [REPO-DETAILED] Nuevo cache size: ${this.cache.size}`)
+      } else {
+        console.log(`❌ [REPO-DETAILED] No se encontró prospecto en BD`)
+        console.log(`🔍 [REPO-DETAILED] Verificación: el registro NO existe en prospecto_actual`)
+        console.log(`💾 [REPO-DETAILED] No guardando en cache (resultado null)`)
       }
 
+      console.log(`🔍 [REPO-DETAILED] ===== FIN BÚSQUEDA DETALLADA =====\n`)
       console.log(`🔍 [REPO] Prospecto encontrado: ${whatsapp} - ${prospecto?.nombre || 'No encontrado'}`)
       return prospecto
     } catch (error) {
+      console.error(`\n💥 [REPO-DETAILED] ===== ERROR EN QUERY =====`)
+      console.error(`❌ [REPO-DETAILED] Error ejecutando query Prisma:`)
+      console.error(`📋 [REPO-DETAILED] Error detalles:`, {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack?.split('\n').slice(0, 5) : undefined
+      })
+      console.error(`💥 [REPO-DETAILED] ===== FIN ERROR =====\n`)
       console.error(`❌ [REPO] Error buscando prospecto ${whatsapp}:`, error)
       return null
     }
@@ -371,7 +438,17 @@ export class PrismaProspectoActualRepository implements IProspectoActualReposito
   // 🧹 Cache management
   private invalidateCache(whatsapp: string): void {
     const cacheKey = `prospecto:${whatsapp}`
-    this.cache.delete(cacheKey)
+    console.log(`\n🧹 [CACHE-INVALIDATE] ===== LIMPIANDO CACHE =====`)
+    console.log(`📱 [CACHE-INVALIDATE] WhatsApp: "${whatsapp}"`)
+    console.log(`🔑 [CACHE-INVALIDATE] CacheKey: "${cacheKey}"`)
+    console.log(`📊 [CACHE-INVALIDATE] Cache size antes: ${this.cache.size}`)
+    console.log(`💾 [CACHE-INVALIDATE] Entrada existe antes: ${this.cache.has(cacheKey)}`)
+    
+    const deleted = this.cache.delete(cacheKey)
+    
+    console.log(`🗑️ [CACHE-INVALIDATE] Eliminación exitosa: ${deleted}`)
+    console.log(`📊 [CACHE-INVALIDATE] Cache size después: ${this.cache.size}`)
+    console.log(`🧹 [CACHE-INVALIDATE] ===== CACHE LIMPIADO =====\n`)
   }
 
   // 🧹 Clear expired cache entries
