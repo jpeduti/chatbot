@@ -372,36 +372,21 @@ ${facultadesList}
   }
 
   /**
-   * 📝 Manejar interés en admisión
+   * 📝 Manejar interés en admisión - Redireccionar a AdmissionFlow
    */
   private async handleAdmissionInterest(context: FlowContext): Promise<StepResult> {
     await this.trackInterest(context, 'admission', 'Proceso de admisión')
 
+    console.log(`📝 [${context.userId}] Redirigiendo a AdmissionFlow`)
+
     return {
       success: true,
-      message: `📝 **Información de Admisión UNIACC**
+      message: `📝 **Información de Admisión UNIACC 2025**
 
-🗓️ **Próximos procesos:**
-• Admisión 2025: Enero - Marzo
-• Proceso Especial: Abril - Junio
-
-📋 **Requisitos básicos:**
-• Licencia de Enseñanza Media
-• Cédula de Identidad
-• Completar formulario de postulación
-
-💰 **Becas disponibles:**
-• Beca Mérito Académico (hasta 50% para top 10%)
-• Beca Apoyo Regional (15-30% estudiantes de regiones)
-• Convenios empresariales
-
-🎓 **¿Te gustaría hablar con un asesor para postular?**
-
-1️⃣ Sí, contactar asesor ahora
-2️⃣ Más información sobre becas
-3️⃣ Volver al menú principal`,
-      nextStep: MainMenuStep.HANDOFF_DECISION,
-      completed: false,
+¡Perfecto! Te voy a conectar con nuestro sistema especializado de admisiones...`,
+      nextStep: MainMenuStep.MENU_DISPLAY,
+      completed: true, // ← Completa MainMenu
+      nextFlow: 'admission', // ← Redirige a AdmissionFlow
       data: { interest_type: 'admission', timestamp: new Date() }
     }
   }

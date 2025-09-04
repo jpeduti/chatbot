@@ -40,6 +40,11 @@ export interface CapturedProspectData {
   // 🔄 ReturningUser específicos
   privacy_choice?: 'personalized' | 'anonymous'    // Elección de privacidad del usuario
   menu_type?: 'personalized' | 'anonymous'         // Tipo de menú mostrado
+  
+  // 📝 AdmissionFlow específicos
+  last_detail_type?: string                        // Tipo de detalle mostrado ('admision_calendario', etc.)
+  last_detail_title?: string                       // Título del último detalle
+  last_detail_services?: string[]                  // Servicios del último detalle
 }
 
 // 🔧 Tipos de Preferencias de Contacto

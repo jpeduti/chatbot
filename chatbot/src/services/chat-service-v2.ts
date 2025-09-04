@@ -20,6 +20,7 @@ import { ProspectCaptureFlow } from '../flows/prospect-capture'
 import { AdvisorRequestFlow } from '../flows/advisor-request'
 import { MainMenuFlow } from '../flows/main-menu'
 import { ReturningUserFlow } from '../flows/returning-user/ReturningUserFlow'
+import { AdmissionFlow } from '../flows/admission/AdmissionFlow'
 import { FlowContextManager } from '../flows/core'
 import { ICacheManager } from '../cache/interfaces/ICacheManager'
 import { SupabaseIntegration } from '../actions/supabase-integration'
@@ -42,6 +43,7 @@ export class ChatServiceV2 {
   private advisorRequestFlow: AdvisorRequestFlow
   private mainMenuFlow: MainMenuFlow
   private returningUserFlow: ReturningUserFlow
+  private admissionFlow: AdmissionFlow
   private flowContextManager: FlowContextManager
   private supabaseIntegration: SupabaseIntegration
   private conversacionRepo: PrismaConversacionRepository
@@ -113,6 +115,12 @@ export class ChatServiceV2 {
       this.prospectServiceV2
     )
     
+    // 📝 Inicializar AdmissionFlow
+    this.admissionFlow = new AdmissionFlow(
+      this.flowContextManager,
+      this.prospectServiceV2
+    )
+    
     // 🎯 Inicializar IntentDetector
     this.intentDetector = new IntentDetectorService()
     
@@ -169,7 +177,8 @@ export class ChatServiceV2 {
       const activeContext = await this.flowContextManager.getActiveContext(userId)
       const isInReturningUserFlow = activeContext && activeContext.currentFlow === 'returning-user'
       const isInMainMenu = activeContext && activeContext.currentFlow === 'main-menu'
-      const hasActiveFlow = isInReturningUserFlow || isInMainMenu
+      const isInAdmissionFlow = activeContext && activeContext.currentFlow === 'admission'
+      const hasActiveFlow = isInReturningUserFlow || isInMainMenu || isInAdmissionFlow
 
       // ⏰ VERIFICAR MENSAJES PENDIENTES DE TIMEOUT (considerar flujos activos)
       console.log(`\n⏰ [${userId}] ===== VERIFICANDO TIMEOUTS PENDIENTES =====`)
@@ -208,7 +217,7 @@ export class ChatServiceV2 {
       this.timeoutService.setSessionTimeout(userId)
       
       console.log(`🔍 [${userId}] Context activo encontrado en memoria`)
-      console.log(`📊 [${userId}] Flujos activos: { returningUser: ${isInReturningUserFlow}, mainMenu: ${isInMainMenu} }`)
+      console.log(`📊 [${userId}] Flujos activos: { returningUser: ${isInReturningUserFlow}, mainMenu: ${isInMainMenu}, admission: ${isInAdmissionFlow} }`)
       
       // 🎪 Elegir flujo basado en contexto activo
       let flowResult: any
@@ -221,6 +230,10 @@ export class ChatServiceV2 {
         // 🏠 Si está en MainMenu, seguir con MainMenu
         console.log(`🏠 [${userId}] Manteniendo en MainMenuFlow`)
         flowResult = await this.mainMenuFlow.processMessage(userId, cleanMessage)
+      } else if (isInAdmissionFlow) {
+        // 📝 Si está en AdmissionFlow, seguir con AdmissionFlow
+        console.log(`📝 [${userId}] Manteniendo en AdmissionFlow`)
+        flowResult = await this.admissionFlow.processMessage(userId, cleanMessage)
       } else {
         // 🎯 DETECTAR INTENCIÓN para elegir flujo (solo si no hay context activo)
         const intent = this.intentDetector.detectIntent(cleanMessage, userContext)
@@ -268,6 +281,43 @@ export class ChatServiceV2 {
               console.error(`❌ [${userId}] Error activando MainMenu:`, menuError)
               // Fallback al mensaje original
             }
+          } else if (flowResult.nextFlow === 'admission') {
+          console.log(`\n📝 [${userId}] ===== TRANSICIÓN A ADMISSION FLOW (V2) =====`)
+          console.log(`🎯 [${userId}] Flujo origen completado, activando AdmissionFlow`)
+          console.log(`⏰ [${userId}] Timestamp transición: ${new Date().toISOString()}`)
+          
+          try {
+            const admissionStartTime = Date.now()
+            
+            // 📝 Ejecutar AdmissionFlow automáticamente
+            console.log(`🚀 [${userId}] Iniciando AdmissionFlow con mensaje "menu"`)
+            const admissionResult = await this.admissionFlow.processMessage(userId, "menu")
+            
+            const admissionTime = Date.now() - admissionStartTime
+            console.log(`⚡ [${userId}] AdmissionFlow procesado en ${admissionTime}ms`)
+            console.log(`✅ [${userId}] AdmissionFlow resultado:`, {
+              success: admissionResult.success,
+              completed: admissionResult.completed,
+              hasMessage: !!admissionResult.message
+            })
+            
+            // Registrar interacción de admisión
+            console.log(`💾 [${userId}] Registrando interacción en conversaciones...`)
+            await this.conversacionRepo.registrarInteraccion(userId, "admission", admissionResult.message)
+            console.log(`📋 [${userId}] Interacción admission registrada exitosamente`)
+            
+            console.log(`📝 [${userId}] ===== ADMISSION FLOW ACTIVADO (V2) =====\n`)
+            
+            // Devolver mensaje del AdmissionFlow
+            return admissionResult.message
+            
+          } catch (admissionError) {
+            console.error(`💥 [${userId}] ===== ERROR EN TRANSICIÓN ADMISSION (V2) =====`)
+            console.error(`❌ [${userId}] Error activando AdmissionFlow:`, admissionError)
+            console.error(`🔍 [${userId}] Error stack:`, admissionError instanceof Error ? admissionError.stack : 'No stack')
+            console.error(`📝 [${userId}] ===== FIN ERROR ADMISSION (V2) =====\n`)
+            // Fallback al mensaje original
+          }
           } else if (flowResult.nextFlow === undefined) {
             // 🔚 Sesión completada sin siguiente flujo (ej: handoff a asesor)
             console.log(`🔚 [${userId}] Sesión completada y finalizada`)
@@ -850,6 +900,43 @@ export class ChatServiceV2 {
             console.error(`❌ [${userId}] Error activando MainMenu:`, menuError)
             // Fallback al mensaje original
           }
+        } else if (flowResult.nextFlow === 'admission') {
+          console.log(`\n📝 [${userId}] ===== TRANSICIÓN A ADMISSION FLOW =====`)
+          console.log(`🎯 [${userId}] Flujo origen completado, activando AdmissionFlow`)
+          console.log(`⏰ [${userId}] Timestamp transición: ${new Date().toISOString()}`)
+          
+          try {
+            const admissionStartTime = Date.now()
+            
+            // 📝 Ejecutar AdmissionFlow automáticamente
+            console.log(`🚀 [${userId}] Iniciando AdmissionFlow con mensaje "menu"`)
+            const admissionResult = await this.admissionFlow.processMessage(userId, "menu")
+            
+            const admissionTime = Date.now() - admissionStartTime
+            console.log(`⚡ [${userId}] AdmissionFlow procesado en ${admissionTime}ms`)
+            console.log(`✅ [${userId}] AdmissionFlow resultado:`, {
+              success: admissionResult.success,
+              completed: admissionResult.completed,
+              hasMessage: !!admissionResult.message
+            })
+            
+            // Registrar interacción de admisión
+            console.log(`💾 [${userId}] Registrando interacción en conversaciones...`)
+            await this.conversacionRepo.registrarInteraccion(userId, "admission", admissionResult.message)
+            console.log(`📋 [${userId}] Interacción admission registrada exitosamente`)
+            
+            console.log(`📝 [${userId}] ===== ADMISSION FLOW ACTIVADO =====\n`)
+            
+            // Devolver mensaje del AdmissionFlow
+            return admissionResult.message
+            
+          } catch (admissionError) {
+            console.error(`💥 [${userId}] ===== ERROR EN TRANSICIÓN ADMISSION =====`)
+            console.error(`❌ [${userId}] Error activando AdmissionFlow:`, admissionError)
+            console.error(`🔍 [${userId}] Error stack:`, admissionError instanceof Error ? admissionError.stack : 'No stack')
+            console.error(`📝 [${userId}] ===== FIN ERROR ADMISSION =====\n`)
+            // Fallback al mensaje original
+          }
         } else if (flowResult.nextFlow === undefined) {
           // 🔚 Sesión completada sin siguiente flujo (ej: handoff a asesor)
           console.log(`🔚 [${userId}] Sesión completada y finalizada`)
@@ -869,9 +956,9 @@ export class ChatServiceV2 {
         }
       }
       
-      // ⚠️ Incluir warning si existe
+      // ⚠️ Incluir warning si existe (SOLO si el flujo NO está completado)
       let finalMessage = flowResult.message
-      if (pendingWarning) {
+      if (pendingWarning && !flowResult.completed) {
         finalMessage = `⚠️ ${pendingWarning}\n\n${flowResult.message}`
       }
       

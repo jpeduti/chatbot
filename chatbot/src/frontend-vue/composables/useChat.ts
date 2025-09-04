@@ -35,8 +35,8 @@ export function useChat() {
   // ⏰ Sistema de Timeout
   const SESSION_TIMEOUT = 20000 // 20 segundos (sync con backend)
   const WARNING_TIMEOUT = 10000 // 10 segundos
-  let sessionTimer: NodeJS.Timeout | null = null
-  let warningTimer: NodeJS.Timeout | null = null
+  let sessionTimer: number | null = null
+  let warningTimer: number | null = null
 
   // Computed properties
   const lastMessage = computed(() => 
@@ -55,19 +55,41 @@ export function useChat() {
 
   // ⏰ Funciones de Timeout
   const clearTimeouts = () => {
+    console.log('🧹 [FRONTEND] clearTimeouts() ejecutándose...')
+    console.log('🧹 [FRONTEND] Timers antes:', { 
+      sessionTimer: !!sessionTimer, 
+      warningTimer: !!warningTimer 
+    })
+    
     if (sessionTimer) {
       clearTimeout(sessionTimer)
       sessionTimer = null
+      console.log('🧹 [FRONTEND] sessionTimer cancelado')
     }
     if (warningTimer) {
       clearTimeout(warningTimer)
       warningTimer = null
+      console.log('🧹 [FRONTEND] warningTimer cancelado')
     }
     chatState.timeoutWarning = false
     chatState.remainingTime = 0
+    
+    console.log('🧹 [FRONTEND] clearTimeouts() completado')
+  }
+
+  const resetSession = () => {
+    console.log('🔄 [FRONTEND] Reiniciando sesión')
+    chatState.sessionActive = true
+    clearTimeouts()
   }
 
   const startSessionTimeout = () => {
+    // 🛑 NO reiniciar timeouts si la sesión ya terminó
+    if (!chatState.sessionActive) {
+      console.log('🔚 [FRONTEND] Sesión inactiva - no reiniciando timeouts')
+      return
+    }
+    
     clearTimeouts()
     
     // Reset estado
@@ -77,12 +99,17 @@ export function useChat() {
     
     // Warning timer
     warningTimer = setTimeout(() => {
-      chatState.timeoutWarning = true
-      addMessage(
-        '⚠️ Tu sesión expirará en 10 segundos por inactividad. Escribe algo para continuar.',
-        'system',
-        { type: 'warning' }
-      )
+      console.log('⚠️ [FRONTEND] WARNING TIMER EJECUTÁNDOSE - ¿Sesión activa?', chatState.sessionActive)
+      if (chatState.sessionActive) {
+        chatState.timeoutWarning = true
+        addMessage(
+          '⚠️ Tu sesión expirará en 10 segundos por inactividad. Escribe algo para continuar.',
+          'system',
+          { type: 'warning' }
+        )
+      } else {
+        console.log('🔚 [FRONTEND] WARNING CANCELADO - Sesión ya terminada')
+      }
     }, WARNING_TIMEOUT)
     
     // Session timeout
@@ -145,10 +172,17 @@ export function useChat() {
   }
 
   const sendMessage = async (content: string): Promise<void> => {
+    console.log('🚀 [FRONTEND] sendMessage() ejecutándose con:', content)
+    
     if (!content.trim() || chatState.isSending) return
 
     chatState.isSending = true
     chatState.hasError = false
+
+    // 🔄 Reiniciar sesión si el usuario escribe "hola" y la sesión está inactiva
+    if (content.toLowerCase().includes('hola') && !chatState.sessionActive) {
+      resetSession()
+    }
 
     // ⏰ Reiniciar timeout con cada mensaje
     startSessionTimeout()
@@ -209,6 +243,30 @@ export function useChat() {
 
       // Ocultar typing y agregar respuesta
       hideTyping()
+      
+      // 🔍 Detectar si la sesión terminó (flujo completado)
+      console.log('🔍 [FRONTEND] Analizando respuesta del bot:', botResponse.substring(0, 100) + '...')
+      
+      const sessionEnded = botResponse.includes('Para nuevas consultas, escribe "hola"') ||
+                          botResponse.includes('escribe "hola" y comenzaremos una nueva conversación') ||
+                          botResponse.includes('Sesión completada') ||
+                          botResponse.includes('sesión terminada')
+      
+      console.log('🔍 [FRONTEND] ¿Sesión terminada?', sessionEnded)
+      console.log('🔍 [FRONTEND] Estado actual:', { 
+        sessionActive: chatState.sessionActive, 
+        timeoutWarning: chatState.timeoutWarning,
+        hasSessionTimer: !!sessionTimer,
+        hasWarningTimer: !!warningTimer
+      })
+      
+      if (sessionEnded) {
+        // 🛑 CANCELAR TIMEOUTS - La sesión terminó exitosamente
+        console.log('🔚 [FRONTEND] Sesión terminada - cancelando timeouts')
+        clearTimeouts()
+        chatState.sessionActive = false
+        console.log('✅ [FRONTEND] Timeouts cancelados y sesión desactivada')
+      }
       
       // Agregar mensaje del bot sin quick replies (usuario escribe manualmente)
       addMessage(botResponse, 'bot', {
@@ -362,6 +420,7 @@ export function useChat() {
     handleQuickReply,
     showTyping,
     hideTyping,
+    resetSession,
     initializeChat,
     
     // ⏰ Timeout methods
