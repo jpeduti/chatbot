@@ -893,20 +893,51 @@ export class AdmissionFlow {
     const nivelInteres = tipoConsulta.includes('_asesor') ? "alto" : 
                         tipoConsulta.includes('_timeout') ? "bajo" : "medio"
     
+    // 🔍 OBTENER DATOS COMPLETOS DEL PROSPECTO ORIGINAL
+    let prospectoOriginal = null
+    try {
+      prospectoOriginal = await this.prospectService.obtenerProspecto(context.userId)
+      console.log(`🔍 [${context.userId}] Datos originales del prospecto obtenidos:`, {
+        nombre: prospectoOriginal?.nombre,
+        email: prospectoOriginal?.email,
+        edad: prospectoOriginal?.edad,
+        region: prospectoOriginal?.region
+      })
+    } catch (error) {
+      console.warn(`⚠️ [${context.userId}] No se pudieron obtener datos originales del prospecto:`, error)
+    }
+    
+    // 📊 PRESERVAR DATOS ORIGINALES + AGREGAR CAMPOS ESPECÍFICOS DEL FLUJO
     const dataToSave = {
       whatsapp: context.userId,
-      nombre: context.capturedData.nombre || "Prospecto",
-      email: context.capturedData.email || "",
-      telefono: context.capturedData.telefono || context.userId,
+      // ✅ PRESERVAR datos originales del prospecto
+      nombre: prospectoOriginal?.nombre || context.capturedData.nombre || "Prospecto",
+      email: prospectoOriginal?.email || context.capturedData.email || "",
+      telefono: prospectoOriginal?.telefono || context.capturedData.telefono || context.userId,
+      edad: prospectoOriginal?.edad || context.capturedData.edad || undefined,
+      region: prospectoOriginal?.region || context.capturedData.region || undefined,
+      carrera_interes: prospectoOriginal?.carrera_interes || context.capturedData.carrera_interes || "Sin especificar",
+      facultad_interes: prospectoOriginal?.facultad_interes || context.capturedData.facultad_interes || "",
+      // ✅ AGREGAR campos específicos del flujo de admisión
       source: "chat-demo",
       tipo_consulta: tipoConsulta,
       nivel_interes: nivelInteres,
-      ultima_interaccion: new Date().toISOString()
+      ultima_interaccion: new Date().toISOString(),
+      // ✅ PRESERVAR otros campos importantes
+      telefono_confirmado: prospectoOriginal?.telefono_confirmado || context.capturedData.telefono_confirmado || true,
+      preferencia_contacto: prospectoOriginal?.preferencia_contacto || context.capturedData.preferencia_contacto || "normal"
     }
 
     console.log(`💾 [${context.userId}] ===== DATOS PARA BASE DE DATOS =====`)
-    console.log(`📊 [${context.userId}] Datos para prospecto_actual:`, {
+    console.log(`📊 [${context.userId}] Datos COMPLETOS para prospecto_actual:`, {
       whatsapp: dataToSave.whatsapp,
+      nombre: dataToSave.nombre,
+      email: dataToSave.email,
+      telefono: dataToSave.telefono,
+      edad: dataToSave.edad,
+      region: dataToSave.region,
+      carrera_interes: dataToSave.carrera_interes,
+      facultad_interes: dataToSave.facultad_interes,
       tipo_consulta: dataToSave.tipo_consulta,
       nivel_interes: dataToSave.nivel_interes,
       ultima_interaccion: dataToSave.ultima_interaccion,

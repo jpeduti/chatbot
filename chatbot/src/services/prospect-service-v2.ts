@@ -48,8 +48,7 @@ export class ProspectServiceV2 {
         telefono: datos.telefono || undefined,
         edad: datos.edad,
         region: datos.region,
-        carrera_interes: (datos as any).carrera_interes || 'Sin especificar',
-        facultad_interes: (datos as any).facultad_interes || 'Sin especificar',
+        // carrera_interes y facultad_interes se manejan en metadata
         metadata: {
           campo_capturado: campo,
           valor_anterior: (datos as any)[campo],
@@ -78,6 +77,57 @@ export class ProspectServiceV2 {
         success: false,
         message: `Error en progressive capture: ${campo}`,
         error: error instanceof Error ? error.message : 'Error desconocido'
+      }
+    }
+  }
+
+  /**
+   * 🔍 Obtener datos completos de un prospecto existente
+   */
+  async obtenerProspecto(whatsapp: string): Promise<ProspectoData | null> {
+    try {
+      console.log(`🔍 [PROSPECT-V2] Obteniendo datos completos de prospecto: ${whatsapp}`)
+      
+      // 🔍 Buscar en prospectos actuales
+      const prospectoExistente = await this.prospectoActualRepo.findByWhatsapp(whatsapp)
+      
+      if (prospectoExistente) {
+        console.log(`✅ [PROSPECT-V2] Prospecto encontrado: ${prospectoExistente.nombre}`)
+        return this.mapPrismaToProspectoData(prospectoExistente)
+      }
+
+      console.log(`❌ [PROSPECT-V2] Prospecto no encontrado: ${whatsapp}`)
+      return null
+    } catch (error) {
+      console.error(`❌ [PROSPECT-V2] Error obteniendo prospecto ${whatsapp}:`, error)
+      return null
+    }
+  }
+
+  /**
+   * 🔄 Mapear datos de Prisma a ProspectoData
+   */
+  private mapPrismaToProspectoData(prismaData: any): ProspectoData {
+    return {
+      whatsapp: prismaData.whatsapp,
+      nombre: prismaData.nombre || 'Usuario',
+      email: prismaData.email || null,
+      telefono: prismaData.telefono || null,
+      edad: prismaData.edad || undefined,
+      region: prismaData.region || undefined,
+      carrera_interes: prismaData.carrera_interes || 'Sin especificar',
+      facultad_interes: prismaData.facultad_interes || '',
+      nivel_interes: prismaData.nivel_interes || 'medio',
+      tipo_consulta: prismaData.tipo_consulta_actual || 'general',
+      source: prismaData.source || 'chatbot',
+      flujo_actual: prismaData.flujo_actual || 'completado',
+      telefono_confirmado: prismaData.telefono_confirmado || false,
+      preferencia_contacto: prismaData.preferencia_contacto || 'normal',
+      datos_adicionales: {
+        primera_interaccion: prismaData.primera_interaccion,
+        ultima_interaccion: prismaData.ultima_interaccion,
+        total_sesiones: prismaData.total_sesiones,
+        ejecutivo_asignado: prismaData.ejecutivos?.[0]?.nombre || null
       }
     }
   }
@@ -381,22 +431,6 @@ export class ProspectServiceV2 {
     return steps[campo as keyof typeof steps] || 'otro'
   }
 
-  private mapPrismaToProspectoData(prospecto: any): ProspectoData {
-    return {
-      whatsapp: prospecto.whatsapp,
-      nombre: prospecto.nombre,
-      email: prospecto.email,
-      telefono: prospecto.telefono,
-      edad: prospecto.edad,
-      region: prospecto.region,
-      carrera_interes: prospecto.carrera_interes,
-      nivel_interes: prospecto.nivel_interes,
-      tipo_consulta: prospecto.tipo_consulta_actual,
-      telefono_confirmado: prospecto.telefono_confirmado,
-      preferencia_contacto: prospecto.preferencia_contacto,
-      source: 'uniacc_chatbot'
-    }
-  }
 
   private mapHistorialToProspectoData(historial: any): ProspectoData {
     return {
