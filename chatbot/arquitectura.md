@@ -98,6 +98,262 @@ Este documento detalla la refactorización completa del chatbot de UNIACC, trans
 
 ---
 
+## 🔄 Sistema de Generación de Flujos
+
+### 📐 Arquitectura de Flujos
+
+El sistema de flujos del chatbot UNIACC utiliza una **arquitectura basada en FlowContext** que permite conversaciones dinámicas, captura progresiva de datos y experiencias personalizadas.
+
+#### **1. Orquestador Principal: ChatServiceV2**
+
+```typescript
+export class ChatServiceV2 {
+  // 1. DETECCIÓN DE INTENCIÓN
+  private async detectIntent(message: string, userContext: any): Promise<IntentResult> {
+    const normalized = message.toLowerCase().trim()
+    const greetingPatterns = ['hola', 'hi', 'buenas', 'hello', 'hey']
+    
+    if (greetingPatterns.some(pattern => normalized.includes(pattern))) {
+      return { intent: 'greeting', confidence: 0.9, flow: 'prospect-capture' }
+    }
+    
+    // Análisis contextual y de palabras clave
+    return this.analyzeContextualIntent(message, userContext)
+  }
+
+  // 2. SELECCIÓN DE FLUJO
+  private selectFlow(intent: IntentResult, currentContext: FlowContext): FlowInstance {
+    if (currentContext?.currentFlow) {
+      return this.getFlowInstance(currentContext.currentFlow)
+    }
+    
+    switch (intent.flow) {
+      case 'prospect-capture': return new ProspectCaptureFlow()
+      case 'main-menu': return new MainMenuFlow()
+      case 'admission': return new AdmissionFlow()
+      case 'returning-user': return new ReturningUserFlow()
+      default: return new MainMenuFlow()
+    }
+  }
+
+  // 3. CREACIÓN DE CONTEXTO
+  private async createFlowContext(userId: string, flow: FlowInstance, message: string): Promise<FlowContext> {
+    const context: FlowContext = {
+      userId,
+      sessionId: `${flow.constructor.name}_${Date.now()}`,
+      currentFlow: flow.constructor.name.toLowerCase().replace('flow', ''),
+      currentStep: 'initial',
+      isActive: true,
+      capturedData: {},
+      preferences: this.getDefaultPreferences(),
+      sessionMetadata: this.createSessionMetadata(),
+      timeout: this.createTimeoutConfig(),
+      validationErrors: [],
+      metrics: this.createMetrics(),
+      needsSave: true,
+      version: '1.0.0',
+      metadata: this.createMetadata()
+    }
+    
+    await this.flowContextManager.saveContext(context)
+    return context
+  }
+
+  // 4. EJECUCIÓN DEL FLUJO
+  private async executeFlow(flow: FlowInstance, context: FlowContext, message: string): Promise<FlowResult> {
+    try {
+      const result = await flow.processMessage(context, message)
+      
+      // Actualizar contexto con resultado
+      if (result.success && result.nextStep) {
+        context.currentStep = result.nextStep
+        context.lastMessage = message
+        context.metrics.stepsCompleted++
+        
+        if (result.data) {
+          Object.assign(context.capturedData, result.data)
+        }
+      }
+      
+      // Persistir contexto actualizado
+      await this.flowContextManager.saveContext(context)
+      
+      return result
+    } catch (error) {
+      return this.handleFlowError(error, context)
+    }
+  }
+}
+```
+
+#### **2. Patrón de Transición Entre Flujos**
+
+```typescript
+// TRANSICIÓN AUTOMÁTICA ENTRE FLUJOS
+private async handleFlowTransition(result: FlowResult, userId: string): Promise<FlowResult> {
+  if (result.nextFlow) {
+    console.log(`🔄 [${userId}] Transición: ${result.currentFlow} → ${result.nextFlow}`)
+    
+    // Limpiar contexto actual
+    await this.flowContextManager.cleanupContext(userId)
+    
+    // Crear nuevo flujo
+    const nextFlow = this.getFlowInstance(result.nextFlow)
+    const nextContext = await this.createFlowContext(userId, nextFlow, 'menu')
+    
+    // Ejecutar nuevo flujo
+    return await nextFlow.processMessage(nextContext, 'menu')
+  }
+  
+  // TERMINACIÓN DE FLUJO
+  if (result.completed) {
+    console.log(`🏁 [${userId}] Flujo completado: ${result.currentFlow}`)
+    await this.flowContextManager.cleanupContext(userId)
+    return this.generateCompletionMessage(result)
+  }
+  
+  return result
+}
+```
+
+#### **3. Preservación de Datos Entre Flujos**
+
+```typescript
+// SISTEMA DE PRESERVACIÓN DE DATOS
+export class AdmissionFlow {
+  private async saveUserData(context: FlowContext, tipoConsulta: string): Promise<void> {
+    // 🔍 OBTENER DATOS COMPLETOS DEL PROSPECTO ORIGINAL
+    let prospectoOriginal = null
+    try {
+      prospectoOriginal = await this.prospectService.obtenerProspecto(context.userId)
+      console.log(`🔍 [${context.userId}] Datos originales obtenidos:`, {
+        nombre: prospectoOriginal?.nombre,
+        email: prospectoOriginal?.email,
+        edad: prospectoOriginal?.edad,
+        region: prospectoOriginal?.region
+      })
+    } catch (error) {
+      console.warn(`⚠️ [${context.userId}] No se pudieron obtener datos originales:`, error)
+    }
+    
+    // 📊 PRESERVAR DATOS ORIGINALES + AGREGAR CAMPOS ESPECÍFICOS
+    const dataToSave = {
+      whatsapp: context.userId,
+      // ✅ PRESERVAR datos originales del prospecto
+      nombre: prospectoOriginal?.nombre || context.capturedData.nombre || "Prospecto",
+      email: prospectoOriginal?.email || context.capturedData.email || "",
+      telefono: prospectoOriginal?.telefono || context.capturedData.telefono || context.userId,
+      edad: prospectoOriginal?.edad || context.capturedData.edad || undefined,
+      region: prospectoOriginal?.region || context.capturedData.region || undefined,
+      carrera_interes: prospectoOriginal?.carrera_interes || context.capturedData.carrera_interes || "Sin especificar",
+      facultad_interes: prospectoOriginal?.facultad_interes || context.capturedData.facultad_interes || "",
+      // ✅ AGREGAR campos específicos del flujo
+      source: "chat-demo",
+      tipo_consulta: tipoConsulta,
+      nivel_interes: this.calculateNivelInteres(tipoConsulta),
+      ultima_interaccion: new Date().toISOString(),
+      // ✅ PRESERVAR otros campos importantes
+      telefono_confirmado: prospectoOriginal?.telefono_confirmado || context.capturedData.telefono_confirmado || true,
+      preferencia_contacto: prospectoOriginal?.preferencia_contacto || context.capturedData.preferencia_contacto || "normal"
+    }
+
+    // 💾 GUARDAR EN BASE DE DATOS
+    await this.prospectService.guardarProspecto(context.userId, dataToSave)
+  }
+}
+```
+
+#### **4. Sistema de Timeout Management**
+
+```typescript
+// BACKEND: Timeout Service
+export class TimeoutService {
+  async handleSessionTimeoutWithFlowContext(userId: string): Promise<string> {
+    try {
+      const activeContext = await this.flowContextManager.getContext(userId)
+      if (activeContext) {
+        // Obtener datos del contexto
+        const capturedData = {
+          nombre: activeContext.capturedData?.nombre,
+          email: activeContext.capturedData?.email,
+          telefono: activeContext.capturedData?.telefono || userId,
+          edad: activeContext.capturedData?.edad,
+          region: activeContext.capturedData?.region
+        }
+        
+        // Guardar datos por timeout
+        await this.prospectService.guardarProspecto(userId, {
+          ...capturedData,
+          tipo_consulta: `${activeContext.capturedData.last_detail_type}_timeout`,
+          nivel_interes: 'bajo',
+          ultima_interaccion: new Date().toISOString()
+        })
+        
+        return this.generateTimeoutMessage(activeContext)
+      }
+    } catch (error) {
+      console.error(`❌ [TIMEOUT] Error procesando timeout:`, error)
+    }
+    
+    return this.generateGenericTimeoutMessage()
+  }
+}
+
+// FRONTEND: Timeout Detection
+export const useChat = () => {
+  const sendMessage = async (content: string) => {
+    // ... lógica de envío
+    
+    // Detectar terminación de sesión
+    const sessionEnded = botResponse.includes("escribe 'hola'") || 
+                        botResponse.includes("nueva conversación")
+    
+    if (sessionEnded) {
+      console.log('🔚 [FRONTEND] Sesión terminada - cancelando timeouts')
+      clearTimeouts()
+      chatState.sessionActive = false
+    }
+  }
+}
+```
+
+#### **5. Flujo de Generación Automática Completo**
+
+```mermaid
+graph TD
+    A[Mensaje del Usuario] --> B[ChatServiceV2.processMessage]
+    B --> C[Detectar Intención]
+    C --> D{¿Flujo Activo?}
+    D -->|Sí| E[Continuar Flujo Actual]
+    D -->|No| F[Seleccionar Nuevo Flujo]
+    F --> G[Crear FlowContext]
+    G --> H[Ejecutar Flujo]
+    E --> H
+    H --> I[Procesar Mensaje]
+    I --> J[Actualizar Contexto]
+    J --> K{¿Próximo Flujo?}
+    K -->|Sí| L[Transición de Flujo]
+    K -->|No| M{¿Completado?}
+    M -->|Sí| N[Terminar Sesión]
+    M -->|No| O[Esperar Siguiente Mensaje]
+    L --> G
+    N --> P[Cleanup Contexto]
+    O --> A
+    P --> Q[Generar Mensaje Final]
+```
+
+### 🎯 Características Clave del Sistema de Flujos
+
+1. **🔄 Orquestación Automática** - Transiciones fluidas entre flujos
+2. **🛡️ Preservación de Datos** - Datos completos mantenidos entre flujos
+3. **⏰ Timeout Management** - Manejo inteligente de inactividad
+4. **📊 Logging Detallado** - Debugging y monitoreo completo
+5. **🔒 Type Safety** - TypeScript en toda la arquitectura
+6. **⚡ Performance** - Cache integration para optimización
+7. **🧪 Testeable** - Interfaces y mocks para testing
+
+---
+
 ## 🗄️ Repository Pattern
 
 ### 🤔 ¿Qué es el Repository Pattern?

@@ -1,0 +1,77 @@
+{
+  "name": "@uniacc-chatbot/claude-context",
+  "version": "1.1.0",
+  "description": "Contexto y herramientas para Claude Code - UNIACC ChatBot System",
+  "scripts": {
+    "init": "node claude-init.js",
+    "update": "node update-context.js",
+    "report": "node update-context.js --report",
+    "health": "node claude-init.js --health",
+    "task": "node update-context.js --task",
+    "completed": "node update-context.js --completed",
+    "phase": "node update-context.js --phase",
+    "check-services": "curl -s http://localhost:3001/health && curl -s http://localhost:3002/health && curl -s http://localhost:3000 -I",
+    "test-chat": "echo 'Abriendo chat demo...' && start http://localhost:3001/chat",
+    "test-dashboard": "echo 'Abriendo dashboard...' && start http://localhost:3000",
+    "debug-logs": "echo 'Logs del ChatBot:' && tail -20 log_chatbot.txt && echo '---' && echo 'Logs del Dashboard/API:' && tail -20 log_dashboard_api.txt",
+    "sync-context": "node update-context.js && echo 'Contexto sincronizado'",
+    "pre-testing": "npm run init && npm run check-services",
+    "analyze-errors": "grep -i 'error\\|failed\\|❌' log_chatbot.txt log_dashboard_api.txt | tail -10",
+    
+    "NEW_COMMANDS_SUGGESTED": "--- Comandos sugeridos para agregar ---",
+    "performance-check": "echo 'Análisis de performance:' && grep -c 'timeout\\|slow\\|error' log_chatbot.txt log_dashboard_api.txt && echo 'Timeouts totales encontrados'",
+    "fix-timeout": "echo 'Analizando timeouts:' && grep -A5 -B5 'timeout.*exceeded' log_chatbot.txt",
+    "debug-save": "echo 'Debugging guardado de prospectos:' && grep -A10 'Guardando\\|guardado exitosamente' log_chatbot.txt | tail -20",
+    "monitor-live": "echo 'Monitoring en tiempo real:' && tail -f log_chatbot.txt log_dashboard_api.txt",
+    "quick-diagnosis": "npm run performance-check && npm run analyze-errors && npm run check-services",
+    "full-context": "npm run init && npm run quick-diagnosis && echo 'Contexto completo cargado para Claude'",
+    
+    "TESTING_COMMANDS": "--- Comandos de testing automatizado ---",
+    "run-test-scenario": "node templates/scripts/test-runner.js",
+    "test-progressive-capture": "node templates/scripts/test-runner.js progressive-capture-complete",
+    "test-abandono-email": "node templates/scripts/test-runner.js abandono-con-email", 
+    "test-returning-user": "node templates/scripts/test-runner.js returning-user-recognition",
+    "test-anti-duplicates": "node templates/scripts/test-runner.js anti-duplicates-validation",
+    "test-asesor-urgente": "node templates/scripts/test-runner.js asesor-urgente-flow",
+    "test-all-scenarios": "node templates/scripts/test-runner.js",
+    "test-with-services": "npm run pre-testing && npm run test-all-scenarios"
+  },
+  "keywords": [
+    "claude-code",
+    "context",
+    "uniacc-chatbot",
+    "development-tools",
+    "educational-chatbot",
+    "whatsapp-integration",
+    "supabase-integration"
+  ],
+  "author": "Juan Pablo Silva",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "fs": "*",
+    "path": "*"
+  },
+  "claudeConfig": {
+    "projectType": "educational-chatbot",
+    "institution": "UNIACC",
+    "architecture": "microservices",
+    "services": ["chatbot:3001", "dashboard:3000", "api:3002"],
+    "database": "supabase",
+    "currentPhase": "testing-multiple-queries-with-performance-fixes",
+    "knownIssues": [
+      "timeout-5000ms-interaction-logging",
+      "region-save-validation-pending",
+      "facultad-interes-mapping-debug"
+    ],
+    "dynamicFiles": ["log_chatbot.txt", "log_dashboard_api.txt", "supabase_config_actual.sql"],
+    "lastSync": "2025-08-28",
+    "performanceThresholds": {
+      "apiResponseTime": "< 2000ms",
+      "supabaseQueryTime": "< 1000ms", 
+      "chatbotProcessingTime": "< 500ms"
+    }
+  }
+}

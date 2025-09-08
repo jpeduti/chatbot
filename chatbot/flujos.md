@@ -24,6 +24,9 @@ El sistema de flujos del chatbot UNIACC utiliza una **arquitectura basada en Flo
 - **⚡ Cache Integration** - Performance optimizada
 - **📱 Mobile-First** - Optimizado para WhatsApp
 - **🔒 Type Safety** - 100% TypeScript
+- **🛡️ Data Preservation** - Preservación completa de datos entre flujos
+- **⏰ Timeout Management** - Manejo inteligente de timeouts
+- **🎯 Flow Orchestration** - Orquestación automática de transiciones
 
 ---
 
@@ -55,6 +58,70 @@ El sistema de flujos del chatbot UNIACC utiliza una **arquitectura basada en Flo
 │  • Context Lifecycle                      │
 │  • Cross-Flow Communication               │
 └───────────────────────────────────────────┘
+```
+
+### 🔄 Generación y Orquestación de Flujos
+
+#### **1. Flujo de Generación Automática**
+
+```typescript
+// 1. DETECCIÓN DE INTENCIÓN
+const intent = await this.detectIntent(message, userContext)
+
+// 2. SELECCIÓN DE FLUJO
+const flow = this.selectFlow(intent, currentContext)
+
+// 3. CREACIÓN DE CONTEXTO
+const flowContext = await this.createFlowContext(userId, flow, message)
+
+// 4. EJECUCIÓN DEL FLUJO
+const result = await flow.processMessage(flowContext, message)
+
+// 5. PERSISTENCIA DE RESULTADO
+await this.persistFlowResult(flowContext, result)
+```
+
+#### **2. Patrón de Transición Entre Flujos**
+
+```typescript
+// TRANSICIÓN AUTOMÁTICA
+if (result.nextFlow) {
+  const nextFlow = this.getFlowInstance(result.nextFlow)
+  const nextContext = await this.createFlowContext(userId, nextFlow, 'menu')
+  return await nextFlow.processMessage(nextContext, 'menu')
+}
+
+// TERMINACIÓN DE FLUJO
+if (result.completed) {
+  await this.cleanupFlowContext(flowContext)
+  return this.generateCompletionMessage(result)
+}
+```
+
+#### **3. Preservación de Datos Entre Flujos**
+
+```typescript
+// ANTES: Solo campos específicos del flujo
+const dataToSave = {
+  whatsapp: context.userId,
+  tipo_consulta: tipoConsulta,
+  nivel_interes: nivelInteres
+  // ❌ Datos originales se perdían
+}
+
+// DESPUÉS: Preservación completa de datos
+const prospectoOriginal = await this.prospectService.obtenerProspecto(context.userId)
+const dataToSave = {
+  whatsapp: context.userId,
+  // ✅ PRESERVAR datos originales
+  nombre: prospectoOriginal?.nombre || context.capturedData.nombre,
+  email: prospectoOriginal?.email || context.capturedData.email,
+  edad: prospectoOriginal?.edad || context.capturedData.edad,
+  region: prospectoOriginal?.region || context.capturedData.region,
+  // ✅ AGREGAR campos específicos del flujo
+  tipo_consulta: tipoConsulta,
+  nivel_interes: nivelInteres
+}
 ```
 
 ### 🎯 Principios de Diseño
@@ -532,6 +599,76 @@ mostrarDetalle() → preguntarContacto() →
 user_choice === '1' → 'beca_talento_asesor'     // ALTO interés
 user_choice === '2' → 'beca_talento_sin_asesor' // MEDIO interés  
 timeout_occurs    → 'beca_talento_timeout'      // BAJO interés
+```
+
+#### 🛡️ **FIXES IMPLEMENTADOS (Enero 2025):**
+
+##### **1. Preservación de Datos del Prospecto**
+```typescript
+// ❌ ANTES: Solo campos específicos del flujo
+const dataToSave = {
+  whatsapp: context.userId,
+  tipo_consulta: tipoConsulta,
+  nivel_interes: nivelInteres
+  // Datos originales se perdían
+}
+
+// ✅ DESPUÉS: Preservación completa de datos
+const prospectoOriginal = await this.prospectService.obtenerProspecto(context.userId)
+const dataToSave = {
+  whatsapp: context.userId,
+  // PRESERVAR datos originales del prospecto
+  nombre: prospectoOriginal?.nombre || context.capturedData.nombre,
+  email: prospectoOriginal?.email || context.capturedData.email,
+  edad: prospectoOriginal?.edad || context.capturedData.edad,
+  region: prospectoOriginal?.region || context.capturedData.region,
+  carrera_interes: prospectoOriginal?.carrera_interes || "Sin especificar",
+  facultad_interes: prospectoOriginal?.facultad_interes || "",
+  // AGREGAR campos específicos del flujo
+  tipo_consulta: tipoConsulta,
+  nivel_interes: nivelInteres,
+  ultima_interaccion: new Date().toISOString()
+}
+```
+
+##### **2. Timeout Management Mejorado**
+```typescript
+// Backend: No mostrar warnings después de flujo completado
+if (pendingWarning && !flowResult.completed) {
+  finalMessage = `⚠️ ${pendingWarning}\n\n${flowResult.message}`
+}
+
+// Frontend: Detección automática de terminación de sesión
+const sessionEnded = botResponse.includes("escribe 'hola'") || 
+                    botResponse.includes("nueva conversación")
+if (sessionEnded) {
+  clearTimeouts()
+  chatState.sessionActive = false
+}
+```
+
+##### **3. Logs Detallados para Debugging**
+```typescript
+console.log(`🔍 [${context.userId}] Datos originales del prospecto obtenidos:`, {
+  nombre: prospectoOriginal?.nombre,
+  email: prospectoOriginal?.email,
+  edad: prospectoOriginal?.edad,
+  region: prospectoOriginal?.region
+})
+
+console.log(`📊 [${context.userId}] Datos COMPLETOS para prospecto_actual:`, {
+  whatsapp: dataToSave.whatsapp,
+  nombre: dataToSave.nombre,
+  email: dataToSave.email,  // ← Ahora preservado
+  telefono: dataToSave.telefono,
+  edad: dataToSave.edad,
+  region: dataToSave.region,
+  carrera_interes: dataToSave.carrera_interes,
+  facultad_interes: dataToSave.facultad_interes,
+  tipo_consulta: dataToSave.tipo_consulta,
+  nivel_interes: dataToSave.nivel_interes
+})
+```
 
 // Tipos implementados (16 categorías × 3 variantes = 48 tipos):
 'admision_calendario_{asesor|sin_asesor|timeout}'

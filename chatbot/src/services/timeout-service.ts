@@ -151,6 +151,33 @@ export class TimeoutService {
           const activeContext = await this.flowContextManager.getContext(userId)
           if (activeContext) {
             flowContextData = activeContext
+            
+            console.log(`✅ [TIMEOUT-FULL] FlowContext encontrado:`)
+            console.log(`📊 [TIMEOUT-FULL] - currentFlow: ${activeContext.currentFlow}`)
+            console.log(`📊 [TIMEOUT-FULL] - currentStep: ${activeContext.currentStep}`)
+            console.log(`📊 [TIMEOUT-FULL] - lastMessage: ${activeContext.lastMessage}`)
+            console.log(`📊 [TIMEOUT-FULL] - capturedData:`, JSON.stringify(activeContext.capturedData, null, 2))
+            
+            // 🎯 MANEJAR TIMEOUT ESPECÍFICO DE ADMISSION FLOW
+            if (activeContext.currentFlow === 'admission' && activeContext.currentStep === 'contact-decision') {
+              console.log(`🎯 [TIMEOUT-ADMISSION] Timeout en AdmissionFlow contact-decision detectado`)
+              console.log(`🔄 [TIMEOUT-ADMISSION] Delegando a AdmissionFlow.handleContactDecisionTimeout`)
+              
+              // Importar y usar el método específico de AdmissionFlow
+              const { AdmissionFlow } = await import('../flows/admission/AdmissionFlow')
+              const admissionFlow = new AdmissionFlow(this.flowContextManager, this.prospectServiceV2)
+              const admissionTimeoutResult = await admissionFlow.handleContactDecisionTimeout(userId)
+              
+              console.log(`✅ [TIMEOUT-ADMISSION] AdmissionFlow timeout procesado exitosamente`)
+              console.log(`📤 [TIMEOUT-ADMISSION] Mensaje específico generado`)
+              
+              // Limpiar estado y contexto
+              this.stateService.clearState(userId)
+              await this.flowContextManager.deactivateContext(userId)
+              
+              return admissionTimeoutResult.message
+            }
+            
             capturedData = {
               nombre: activeContext.capturedData?.nombre,
               email: activeContext.capturedData?.email,
@@ -164,11 +191,6 @@ export class TimeoutService {
               lastMessage: activeContext.lastMessage
             }
             
-            console.log(`✅ [TIMEOUT-FULL] FlowContext encontrado:`)
-            console.log(`📊 [TIMEOUT-FULL] - currentFlow: ${activeContext.currentFlow}`)
-            console.log(`📊 [TIMEOUT-FULL] - currentStep: ${activeContext.currentStep}`)
-            console.log(`📊 [TIMEOUT-FULL] - lastMessage: ${activeContext.lastMessage}`)
-            console.log(`📊 [TIMEOUT-FULL] - capturedData:`, JSON.stringify(activeContext.capturedData, null, 2))
           } else {
             console.log(`❌ [TIMEOUT-FULL] No se encontró FlowContext activo para ${userId}`)
           }
