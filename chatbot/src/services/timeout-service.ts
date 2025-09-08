@@ -207,7 +207,7 @@ export class TimeoutService {
       console.log(`📊 [TIMEOUT-FULL] - flujo_actual: ${stateV1.flujo_actual}`)
       console.log(`📊 [TIMEOUT-FULL] - paso_actual: ${stateV1.paso_actual}`)
       console.log(`📊 [TIMEOUT-FULL] - datos_prospecto:`, JSON.stringify(stateV1.datos_prospecto, null, 2))
-      console.log(`📊 [TIMEOUT-FULL] - telefono_confirmado: ${stateV1.telefono_confirmado}`)
+      console.log(`📊 [TIMEOUT-FULL] - telefono_confirmado: ${stateV1.datos_prospecto?.telefono_confirmado}`)
 
       // 3. 💾 Intentar guardar datos si existen
       if (capturedData) {
@@ -307,7 +307,7 @@ export class TimeoutService {
           nombre: state.datos_prospecto.nombre,
           email: state.datos_prospecto.email,
           telefono: state.datos_prospecto.telefono || userId,
-          telefono_confirmado: state.telefono_confirmado || false,
+          telefono_confirmado: state.datos_prospecto?.telefono_confirmado || false,
           edad: state.datos_prospecto.edad,
           region: state.datos_prospecto.region
         }
@@ -420,14 +420,14 @@ Solo me quedan ${nombre ? 'unos pocos datos' : 'algunas preguntas'} para poder a
       datos.edad || 
       datos.region ||
       datos.telefono ||
-      state.telefono_confirmado
+      state.datos_prospecto?.telefono_confirmado
     )
     
     console.log(`🔍 [TIMEOUT-EVAL] Datos disponibles:`, {
       nombre: !!datos.nombre,
       email: !!datos.email,
       telefono: !!datos.telefono,
-      telefono_confirmado: !!state.telefono_confirmado,
+      telefono_confirmado: !!state.datos_prospecto?.telefono_confirmado,
       shouldSave: hasUsefulData
     })
     

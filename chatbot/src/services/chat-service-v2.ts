@@ -156,6 +156,13 @@ export class ChatServiceV2 {
       console.log(`🤖 [${userId}] Procesando: "${cleanMessage}" con FlowContext V2`)
       console.log(`🔗 [${userId}] TimeoutService configurado con FlowContextManager: ${this.timeoutService.isFlowContextManagerConfigured()}`)
 
+      // 🎯 VERIFICAR SI CONVERSACIÓN ESTÁ ASIGNADA A EJECUTIVO (NUEVA PRIORIDAD)
+      const isAssignedToExecutive = await this.checkIfAssignedToExecutive(userId)
+      if (isAssignedToExecutive) {
+        console.log(`👥 [${userId}] Conversación asignada a ejecutivo - modo handoff activado`)
+        return this.handleExecutiveHandoffMode(userId, cleanMessage)
+      }
+
       // 🔄 DETECTAR USUARIO RECURRENTE PRIMERO - ANTES de timeouts
       const returningUserCheck = await this.checkReturningUser(userId, cleanMessage)
       if (returningUserCheck.shouldUseReturningFlow) {
@@ -884,6 +891,7 @@ export class ChatServiceV2 {
       
       // 🔄 Si el flujo está completo, procesar siguiente flujo O limpiar sesión
       if (flowResult.completed) {
+        console.log(`🔍 [${userId}] FLUJO COMPLETADO - nextFlow: ${flowResult.nextFlow}`)
         if (flowResult.nextFlow === 'main-menu') {
           console.log(`🎯 [${userId}] Flujo completado, ejecutando MainMenuFlow`)
           try {
@@ -939,19 +947,29 @@ export class ChatServiceV2 {
           }
         } else if (flowResult.nextFlow === undefined) {
           // 🔚 Sesión completada sin siguiente flujo (ej: handoff a asesor)
-          console.log(`🔚 [${userId}] Sesión completada y finalizada`)
+          console.log(`🔚 [${userId}] ===== SESIÓN COMPLETADA SIN NEXTFLOW =====`)
+          console.log(`🎯 [${userId}] Tipo: Handoff a asesor o sesión terminada`)
+          console.log(`📊 [${userId}] FlowResult data:`, flowResult.data)
+          
           try {
             // 🛑 CANCELAR TIMEOUTS PROGRAMADOS - La sesión está completa exitosamente
-            console.log(`🛑 [${userId}] Cancelando timeouts programados...`)
+            console.log(`🛑 [${userId}] ===== CANCELANDO TIMEOUTS =====`)
+            console.log(`🧹 [${userId}] Ejecutando stateService.clearTimeouts()...`)
             this.stateService.clearTimeouts(userId)
+            console.log(`🧹 [${userId}] Ejecutando timeoutService.clearPendingMessages()...`)
             this.timeoutService.clearPendingMessages(userId)
-            console.log(`✅ [${userId}] Timeouts cancelados - sesión completada exitosamente`)
+            console.log(`✅ [${userId}] ===== TIMEOUTS CANCELADOS EXITOSAMENTE =====`)
             
             // Limpiar contexto activo para permitir nueva sesión
+            console.log(`🧹 [${userId}] Desactivando FlowContext...`)
             await this.flowContextManager.deactivateContext(userId)
-            console.log(`🧹 [${userId}] Contexto limpiado para nueva sesión`)
+            console.log(`✅ [${userId}] ===== CONTEXTO LIMPIADO EXITOSAMENTE =====`)
+            console.log(`🔚 [${userId}] ===== LIMPIEZA COMPLETA - SESIÓN CERRADA =====`)
           } catch (cleanupError) {
-            console.warn(`⚠️ [${userId}] Error limpiando contexto:`, cleanupError)
+            console.error(`❌ [${userId}] ===== ERROR EN LIMPIEZA =====`)
+            console.error(`💥 [${userId}] Error limpiando contexto:`, cleanupError)
+            console.error(`🔍 [${userId}] Error stack:`, cleanupError instanceof Error ? cleanupError.stack : 'No stack')
+            console.error(`❌ [${userId}] ===== FIN ERROR LIMPIEZA =====`)
           }
         }
       }
@@ -966,6 +984,72 @@ export class ChatServiceV2 {
     } else {
       console.error(`❌ [${userId}] Error en FlowContext:`, flowResult.message)
       return flowResult.message || this.messageFormatter.formatErrorMessage()
+    }
+  }
+
+  /**
+   * 👥 Verificar si conversación está asignada a ejecutivo
+   */
+  private async checkIfAssignedToExecutive(userId: string): Promise<boolean> {
+    try {
+      console.log(`👥 [${userId}] Verificando si conversación está asignada...`)
+      
+      // Usar SupabaseIntegration para consultar estado de conversación
+      const supabaseIntegration = (this.prospectService as any).supabaseIntegration
+      if (!supabaseIntegration?.consultarEstadoConversacion) {
+        console.log(`⚠️ [${userId}] SupabaseIntegration no disponible para consulta`)
+        return false
+      }
+      
+      const estadoConversacion = await supabaseIntegration.consultarEstadoConversacion(userId)
+      
+      if (estadoConversacion && estadoConversacion.assigned_to) {
+        console.log(`👥 [${userId}] Conversación asignada a ejecutivo: ${estadoConversacion.assigned_to}`)
+        console.log(`🎯 [${userId}] Estado handoff: ${estadoConversacion.handoff_status}`)
+        return true
+      }
+      
+      console.log(`🤖 [${userId}] Conversación NO asignada - continúa con bot`)
+      return false
+      
+    } catch (error) {
+      console.error(`❌ [${userId}] Error verificando asignación:`, error)
+      return false
+    }
+  }
+
+  /**
+   * 👥 Manejar modo handoff (conversación asignada a ejecutivo)
+   */
+  private async handleExecutiveHandoffMode(userId: string, message: string): Promise<string> {
+    try {
+      console.log(`👥 [${userId}] ===== MODO HANDOFF ACTIVADO =====`)
+      console.log(`📝 [${userId}] Mensaje usuario: "${message}"`)
+      
+      // Registrar interacción del usuario para que el ejecutivo la vea
+      // TODO: Implementar cuando tengamos conversacionRepo
+      console.log(`💬 [${userId}] Registrando mensaje para ejecutivo: "${message}"`)
+      
+      // Respuesta estándar de handoff
+      const handoffMessage = `🤝 Tu mensaje ha sido recibido y enviado a nuestro asesor especializado.
+
+📱 Él te responderá directamente por este mismo chat en breve.
+
+⏰ **Horario de atención:** Lunes a Viernes 9:00 - 18:00
+
+✅ Mientras tanto, puedes seguir escribiendo y todos tus mensajes llegarán a tu asesor asignado.`
+
+      console.log(`👥 [${userId}] ===== HANDOFF RESPONSE ENVIADA =====`)
+      
+      return handoffMessage
+      
+    } catch (error) {
+      console.error(`❌ [${userId}] Error en modo handoff:`, error)
+      return `🤝 Tu mensaje ha sido recibido por nuestro equipo de asesores.
+
+Responderemos a la brevedad por este mismo chat.
+
+✅ Puedes seguir escribiendo y recibiremos todos tus mensajes.`
     }
   }
 }

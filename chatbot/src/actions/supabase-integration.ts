@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 import logger, { LogCategory } from '../utils/enhanced-logger'
 
 export interface ProspectoData {
@@ -26,10 +27,35 @@ export interface ProspectoData {
 export class SupabaseIntegration {
   private webhookUrl: string
   private webhookSecret: string
+  private client: SupabaseClient | null = null
 
   constructor(webhookUrl: string, webhookSecret: string) {
     this.webhookUrl = webhookUrl
     this.webhookSecret = webhookSecret
+    
+    // ✅ Inicializar cliente Supabase
+    this.initializeSupabaseClient()
+  }
+
+  private initializeSupabaseClient(): void {
+    try {
+      const supabaseUrl = process.env.SUPABASE_URL
+      const supabaseKey = process.env.SUPABASE_ANON_KEY
+      
+      if (!supabaseUrl || !supabaseKey) {
+        console.log('⚠️ [SUPABASE] Variables de entorno no encontradas')
+        console.log(`⚠️ [SUPABASE] SUPABASE_URL: ${supabaseUrl ? 'OK' : 'MISSING'}`)
+        console.log(`⚠️ [SUPABASE] SUPABASE_ANON_KEY: ${supabaseKey ? 'OK' : 'MISSING'}`)
+        return
+      }
+      
+      this.client = createClient(supabaseUrl, supabaseKey)
+      console.log('✅ [SUPABASE] Cliente inicializado correctamente')
+      
+    } catch (error) {
+      console.error('❌ [SUPABASE] Error inicializando cliente:', error)
+      this.client = null
+    }
   }
 
   async enviarProspecto(data: ProspectoData): Promise<{
@@ -337,6 +363,136 @@ export class SupabaseIntegration {
     } catch (error) {
       console.error('💥 Error en sincronización de fallbacks:', error)
       return 0
+    }
+  }
+
+  /**
+   * 💬 Guardar mensaje de ejecutivo en Supabase
+   */
+  async guardarMensajeEjecutivo(mensajeData: any): Promise<boolean> {
+    try {
+      console.log(`💬 [SUPABASE] Guardando mensaje de ejecutivo:`, mensajeData)
+      
+      // ✅ VERIFICAR CLIENTE SUPABASE
+      if (!this.client) {
+        console.log(`⚠️ [SUPABASE] Cliente no disponible para guardar mensaje ejecutivo`)
+        return false
+      }
+      
+      const { error } = await this.client
+        .from('mensajes')
+        .insert({
+          conversacion_id: mensajeData.conversacion_id,
+          content: mensajeData.content,
+          type: 'agent', // ✅ Forzar tipo correcto
+          sender_id: mensajeData.sender_id,
+          sender_name: mensajeData.sender_name,
+          message_type: mensajeData.message_type || 'text',
+          metadata: mensajeData.metadata || {}
+          // ✅ CAMPOS ELIMINADOS: timestamp, status (no existen en Supabase)
+        })
+
+      if (error) {
+        console.error('❌ [SUPABASE] Error guardando mensaje ejecutivo:', error)
+        return false
+      }
+
+      console.log(`✅ [SUPABASE] Mensaje de ejecutivo guardado exitosamente`)
+      return true
+
+    } catch (error) {
+      console.error('💥 [SUPABASE] Error crítico guardando mensaje ejecutivo:', error)
+      return false
+    }
+  }
+
+  /**
+   * 📨 Obtener mensajes nuevos desde una fecha específica
+   */
+  async obtenerMensajesNuevos(conversacionId: string, fechaDesde: Date): Promise<any[]> {
+    try {
+      console.log(`📨 [SUPABASE] Obteniendo mensajes nuevos desde ${fechaDesde.toISOString()}`)
+      
+      const { data, error } = await this.client!
+        .from('mensajes')
+        .select(`
+          id,
+          content,
+          type,
+          sender_id,
+          sender_name,
+          message_type,
+          created_at,
+          metadata
+        `)
+        .eq('conversacion_id', conversacionId)
+        .gte('created_at', fechaDesde.toISOString())
+        .order('created_at', { ascending: true })
+
+      if (error) {
+        console.error('❌ [SUPABASE] Error obteniendo mensajes nuevos:', error)
+        return []
+      }
+
+      console.log(`📨 [SUPABASE] ${data?.length || 0} mensajes nuevos encontrados`)
+      return data || []
+
+    } catch (error) {
+      console.error('💥 [SUPABASE] Error crítico obteniendo mensajes nuevos:', error)
+      return []
+    }
+  }
+
+  /**
+   * 👥 Consultar estado de conversación (asignación a ejecutivo)
+   */
+  async consultarEstadoConversacion(whatsapp: string): Promise<any> {
+    try {
+      console.log(`👥 [SUPABASE] Consultando estado conversación: ${whatsapp}`)
+      
+      // 🔍 Verificar que el cliente Supabase esté disponible
+      if (!this.client) {
+        console.log(`⚠️ [SUPABASE] Cliente no disponible para consulta de conversación`)
+        return null
+      }
+      
+      const { data, error } = await this.client
+        .from('conversaciones')
+        .select(`
+          id,
+          assigned_to,
+          handoff_status,
+          handoff_accepted_at,
+          agent_last_activity,
+          phone_number
+        `)
+        .eq('phone_number', whatsapp)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      if (error) {
+        // No error si no existe - es normal para conversaciones nuevas
+        if (error.code === 'PGRST116') {
+          console.log(`👥 [SUPABASE] No existe conversación para ${whatsapp}`)
+          return null
+        }
+        console.error('❌ [SUPABASE] Error consultando estado conversación:', error)
+        return null
+      }
+
+      console.log(`👥 [SUPABASE] Estado conversación encontrado:`, {
+        id: data.id,
+        assigned_to: data.assigned_to,
+        handoff_status: data.handoff_status,
+        hasActiveAgent: !!data.assigned_to
+      })
+      
+      return data
+
+    } catch (error) {
+      console.error('💥 [SUPABASE] Error crítico consultando estado conversación:', error)
+      return null
     }
   }
 }

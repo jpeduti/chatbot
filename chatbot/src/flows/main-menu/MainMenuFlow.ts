@@ -107,6 +107,13 @@ export class MainMenuFlow {
         nextFlow: stepResult.nextFlow
       }
 
+      console.log(`🏠 [${userId}] ===== MAINMENU FLOW RESULT =====`)
+      console.log(`✅ [${userId}] Success: ${flowResult.success}`)
+      console.log(`🔚 [${userId}] Completed: ${flowResult.completed}`)
+      console.log(`🎯 [${userId}] NextFlow: ${flowResult.nextFlow}`)
+      console.log(`📝 [${userId}] Current Step: ${context.currentStep}`)
+      console.log(`🏠 [${userId}] ===== RETORNANDO AL CHATSERVICE =====`)
+
       console.log(`🏠 [${userId}] Resultado MainMenu:`, {
         step: context.currentStep,
         success: stepResult.success,
@@ -450,7 +457,7 @@ Ya sabes qué quieres estudiar. Te conectaré directamente con un asesor académ
     context.isActive = false
     context.needsSave = true
 
-    return {
+    const advisorResponse = {
       success: true,
       message: `🎓 **¡Perfecto!** En 24 horas te contactarán.
 
@@ -466,6 +473,14 @@ Ya sabes qué quieres estudiar. Te conectaré directamente con un asesor académ
       nextFlow: undefined, // No hay siguiente flujo, sesión terminada
       data: { interest_type: 'advisor', timestamp: new Date(), priority: 'high', session_closed: true }
     }
+
+    console.log(`🎓 [${context.userId}] ===== ADVISOR REQUEST RESPONSE =====`)
+    console.log(`✅ [${context.userId}] Completed: ${advisorResponse.completed}`)
+    console.log(`🔚 [${context.userId}] NextFlow: ${advisorResponse.nextFlow}`)
+    console.log(`📊 [${context.userId}] Data:`, advisorResponse.data)
+    console.log(`🎓 [${context.userId}] ===== RETORNANDO RESPUESTA FINAL =====`)
+
+    return advisorResponse
   }
 
   /**

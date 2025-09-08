@@ -27,7 +27,8 @@ export function useChat() {
     currentUserId: '56999888777',
     sessionActive: true,
     timeoutWarning: false,
-    remainingTime: 0
+    remainingTime: 0,
+    sessionClosedAt: 0
   })
 
   const responseTimes = ref<number[]>([])
@@ -250,8 +251,23 @@ export function useChat() {
       const sessionEnded = botResponse.includes('Para nuevas consultas, escribe "hola"') ||
                           botResponse.includes('escribe "hola" y comenzaremos una nueva conversación') ||
                           botResponse.includes('Sesión completada') ||
-                          botResponse.includes('sesión terminada')
+                          botResponse.includes('sesión terminada') ||
+                          // 🎓 DETECCIÓN ESPECÍFICA PARA SOLICITUD DE ASESOR
+                          (botResponse.includes('¡Perfecto! En 24 horas te contactarán') && 
+                           botResponse.includes('Presiona "Hola" para volver a consultar')) ||
+                          // 🏆 DETECCIÓN PARA OTROS FLUJOS COMPLETADOS
+                          botResponse.includes('¡Gracias por elegir UNIACC!')
       
+      // 🔍 Análisis detallado de detección
+      const detectionResults = {
+        hasGraciasUniacc: botResponse.includes('¡Gracias por elegir UNIACC!'),
+        hasPerfectoContactaran: botResponse.includes('¡Perfecto! En 24 horas te contactarán'),
+        hasPresionaHola: botResponse.includes('Presiona "Hola" para volver a consultar'),
+        advisorFlow: (botResponse.includes('¡Perfecto! En 24 horas te contactarán') && 
+                     botResponse.includes('Presiona "Hola" para volver a consultar'))
+      }
+      
+      console.log('🔍 [FRONTEND] Análisis detección finalización:', detectionResults)
       console.log('🔍 [FRONTEND] ¿Sesión terminada?', sessionEnded)
       console.log('🔍 [FRONTEND] Estado actual:', { 
         sessionActive: chatState.sessionActive, 
@@ -262,10 +278,14 @@ export function useChat() {
       
       if (sessionEnded) {
         // 🛑 CANCELAR TIMEOUTS - La sesión terminó exitosamente
-        console.log('🔚 [FRONTEND] Sesión terminada - cancelando timeouts')
+        console.log('🔚 [FRONTEND] ===== SESIÓN TERMINADA DETECTADA =====')
+        console.log('🔚 [FRONTEND] Motivo:', detectionResults.advisorFlow ? 'Solicitud de asesor' : 'Otro flujo completado')
+        console.log('🛑 [FRONTEND] Cancelando timeouts programados...')
         clearTimeouts()
         chatState.sessionActive = false
-        console.log('✅ [FRONTEND] Timeouts cancelados y sesión desactivada')
+        chatState.sessionClosedAt = Date.now() // ✅ Timestamp del cierre
+        console.log('✅ [FRONTEND] ===== SESIÓN CERRADA EXITOSAMENTE =====')
+        console.log('📨 [FRONTEND] Polling continuará por 2 minutos para detectar ejecutivo')
       }
       
       // Agregar mensaje del bot sin quick replies (usuario escribe manualmente)
@@ -399,11 +419,135 @@ export function useChat() {
     }
   }, { deep: true })
 
+  // 📨 NUEVO: Sistema de polling para mensajes de ejecutivos
+  let pollingInterval: number | null = null
+  let lastPollingCheck = Date.now()
+
+  const startPolling = (): void => {
+    console.log('📨 [POLLING] Iniciando polling de mensajes de ejecutivos')
+    
+    if (pollingInterval) {
+      clearInterval(pollingInterval)
+    }
+    
+    pollingInterval = setInterval(async () => {
+      // ✅ NUEVA LÓGICA: Polling continúa si:
+      // 1. Sesión activa del bot, O
+      // 2. Conversación asignada a ejecutivo (aunque bot esté inactivo)
+      if (chatState.isSending) {
+        return // Solo pausar si se está enviando un mensaje
+      }
+      
+      // ✅ NUEVA LÓGICA: Permitir polling por un tiempo después del cierre de sesión
+      // para detectar asignación de ejecutivo
+        const tiempoSinSesion = Date.now() - (chatState.sessionClosedAt || 0)
+        const TIEMPO_GRACIA = 120000 // 120 segundos (2 minutos) después del cierre de sesión
+      
+      if (!chatState.sessionActive && !chatStateExtended.isAssignedToExecutive) {
+        // Si la sesión cerró hace más de 2 minutos y no hay ejecutivo, detener
+        if (chatState.sessionClosedAt && tiempoSinSesion > TIEMPO_GRACIA) {
+          console.log(`📨 [POLLING] Deteniendo polling - sin sesión por ${Math.floor(tiempoSinSesion/1000)}s y sin ejecutivo`)
+          stopPolling()
+          return
+        }
+        console.log(`📨 [POLLING] Continuando polling en período de gracia (${Math.floor(tiempoSinSesion/1000)}s)`)
+      }
+      
+      try {
+        const desde = new Date(lastPollingCheck).toISOString()
+        console.log(`📨 [POLLING] ${chatState.currentUserId}: Consultando mensajes nuevos desde ${desde}`)
+        const response = await fetch(`/api/mensajes/nuevos/${chatState.currentUserId}?desde=${desde}`)
+        
+        if (!response.ok) {
+          console.warn('⚠️ [POLLING] Error en respuesta:', response.status)
+          return
+        }
+        
+        const data = await response.json()
+        
+        if (data.success && data.mensajes && data.mensajes.length > 0) {
+          console.log(`📨 [POLLING] ${data.mensajes.length} mensajes nuevos de ejecutivo recibidos`)
+          
+          // 🎯 PRIMERO: Verificar si hay asignación nueva y mostrar handoff
+          if (data.conversacion_asignada && !chatStateExtended.isAssignedToExecutive) {
+            chatStateExtended.isAssignedToExecutive = true
+            console.log(`🎯 [POLLING] Conversación asignada a ejecutivo: ${data.ejecutivo_asignado}`)
+            console.log(`🎯 [POLLING] Continuando polling aunque sesión bot esté inactiva`)
+            
+            // 🤝 MOSTRAR MENSAJE DE HANDOFF AUTOMÁTICO PRIMERO
+            // Obtener nombre real del ejecutivo desde Dashboard API
+            let ejecutivoNombre = 'nuestro asesor'
+            try {
+              const ejecutivoResponse = await fetch(`http://localhost:3002/api/ejecutivos`)
+              if (ejecutivoResponse.ok) {
+                const response = await ejecutivoResponse.json()
+                const ejecutivos = response.data || response
+                const ejecutivo = ejecutivos.find((ej: any) => ej.id === data.ejecutivo_asignado)
+                ejecutivoNombre = ejecutivo?.nombre || 'nuestro asesor'
+                console.log(`👤 [HANDOFF] Ejecutivo obtenido: ${ejecutivoNombre}`)
+              }
+            } catch (error) {
+              console.warn(`⚠️ [HANDOFF] No se pudo obtener nombre del ejecutivo: ${error.message}`)
+            }
+            
+            const mensajeHandoff = `🔄 Te he conectado con ${ejecutivoNombre}, uno de nuestros asesores especializados. En un momento te atenderá para resolver todas tus consultas. ¡Gracias por tu paciencia! 😊`
+            
+            addMessage(mensajeHandoff, 'bot', [])
+            console.log(`🤝 [HANDOFF] Mensaje de conexión mostrado al usuario: ${ejecutivoNombre}`)
+          }
+          
+          // 🔄 SEGUNDO: Agregar mensajes de ejecutivo al chat (ordenados por timestamp)
+          const mensajesOrdenados = data.mensajes.sort((a: any, b: any) => {
+            return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          })
+          
+          mensajesOrdenados.forEach((mensaje: any) => {
+            addMessage(`👥 **${mensaje.sender_name}**: ${mensaje.content}`, 'bot', [])
+            console.log(`📨 [POLLING-ORDER] Mostrando mensaje: ${mensaje.sender_name} - ${mensaje.content?.substring(0, 30)}...`)
+          })
+        }
+        
+        lastPollingCheck = Date.now()
+        
+      } catch (error) {
+        console.error('❌ [POLLING] Error consultando mensajes:', error)
+      }
+    }, 3000) // Polling cada 3 segundos
+  }
+
+  const stopPolling = (): void => {
+    console.log('📨 [POLLING] Deteniendo polling')
+    if (pollingInterval) {
+      clearInterval(pollingInterval)
+      pollingInterval = null
+    }
+  }
+
+  // Agregar flag para indicar si está asignado a ejecutivo
+  const chatStateExtended = reactive({
+    ...chatState,
+    isAssignedToExecutive: false
+  })
+
+  // Auto-iniciar polling después del primer mensaje
+  const originalSendMessage = sendMessage
+  const sendMessageWithPolling = async (content: string): Promise<void> => {
+    await originalSendMessage(content)
+    
+    // ✅ SIEMPRE iniciar polling después de cualquier mensaje
+    if (!pollingInterval) {
+      console.log('📨 [FRONTEND] Iniciando polling después del mensaje (independiente del estado de sesión)')
+      setTimeout(() => {
+        startPolling()
+      }, 2000) // Esperar 2 segundos
+    }
+  }
+
   return {
     // Estado
     messages,
     metrics,
-    chatState,
+    chatState: chatStateExtended,
     
     // Computed
     lastMessage,
@@ -414,7 +558,7 @@ export function useChat() {
     // Métodos
     addMessage,
     addBotMessageWithQuickReplies,
-    sendMessage,
+    sendMessage: sendMessageWithPolling,
     clearChat,
     switchVersion,
     handleQuickReply,
@@ -425,6 +569,10 @@ export function useChat() {
     
     // ⏰ Timeout methods
     clearTimeouts,
-    startSessionTimeout
+    startSessionTimeout,
+    
+    // 📨 Polling methods
+    startPolling,
+    stopPolling
   }
 }

@@ -465,10 +465,23 @@ const enviarMensaje = async () => {
   const ejecutivoId = chat.conversacionActiva.value.assigned_to
   if (!ejecutivoId) return
 
+  // 🔍 Obtener datos del ejecutivo actual
+  const ejecutivo = ejecutivos.ejecutivosDisponibles.value.find(e => e.id === ejecutivoId)
+  
+  // 📱 Preparar datos completos para envío al chatbot
+  const ejecutivoData = {
+    id: ejecutivoId,
+    nombre: ejecutivo?.nombre || 'Ejecutivo',
+    whatsapp: chat.conversacionActiva.value.phone_number || chat.conversacionActiva.value.prospecto?.whatsapp
+  }
+
+  console.log(`💬 [CHAT-INTERFACE] Enviando mensaje de ${ejecutivoData.nombre} a ${ejecutivoData.whatsapp}`)
+
   await chat.enviarMensaje(
     chat.conversacionActiva.value.id,
     nuevoMensaje.value.trim(),
-    'ejecutivo'
+    'ejecutivo',
+    ejecutivoData
   )
 
   nuevoMensaje.value = ''

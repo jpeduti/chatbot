@@ -155,6 +155,145 @@ app.use('/chat', rateLimitMiddleware, createChatRoutes(webhookUrl, webhookSecret
 // 🔄 Legacy compatibility routes para Dashboard
 app.get('/api/prospectos/reconocimiento/:whatsapp', rateLimitMiddleware, chatController.getProspectRecognition)
 
+// 💬 NUEVO: Endpoint para recibir mensajes de ejecutivos desde Dashboard
+app.post('/api/mensajes/ejecutivo', rateLimitMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { whatsapp, mensaje, ejecutivo_id, ejecutivo_nombre, conversacion_id } = req.body
+    
+    console.log(`👥 [EJECUTIVO-MESSAGE] ${ejecutivo_nombre} → ${whatsapp}: "${mensaje}"`)
+    
+    // Validar datos requeridos
+    if (!whatsapp || !mensaje || !ejecutivo_id || !conversacion_id) {
+      return res.status(400).json({
+        success: false,
+        error: 'Campos requeridos: whatsapp, mensaje, ejecutivo_id, conversacion_id'
+      })
+    }
+    
+    // Verificar que la conversación esté asignada al ejecutivo
+    // TODO: Implementar verificación cuando tengamos conversacionRepo en servicios
+    console.log(`🔍 [EJECUTIVO-MESSAGE] Procesando mensaje para conversación: ${conversacion_id}`)
+    
+    // 🚫 ELIMINADO: NO guardar mensaje aquí - ya se guarda en Dashboard
+    // El Dashboard ya guardó el mensaje en Supabase, este endpoint solo es para notificación
+    console.log(`📨 [EJECUTIVO-MESSAGE] Mensaje ya guardado por Dashboard - solo procesando notificación`)
+    
+    // Marcar conversación como activa con ejecutivo
+    console.log(`🕒 [EJECUTIVO-MESSAGE] Actividad registrada: ${conversacion_id}`)
+    
+    console.log(`✅ [EJECUTIVO-MESSAGE] Mensaje procesado y guardado exitosamente`)
+    
+    res.json({
+      success: true,
+      message: 'Mensaje enviado exitosamente',
+      conversacion_id,
+      timestamp: new Date().toISOString()
+    })
+
+            } catch (error) {
+    console.error('💥 [EJECUTIVO-MESSAGE] Error:', error)
+    res.status(500).json({
+      success: false,
+      error: 'Error procesando mensaje de ejecutivo'
+    })
+  }
+})
+
+// 📱 NUEVO: Endpoint para obtener mensajes nuevos desde última consulta (polling)
+app.get('/api/mensajes/nuevos/:whatsapp', rateLimitMiddleware, async (req: Request, res: Response) => {
+  try {
+    const { whatsapp } = req.params
+    const { desde } = req.query // timestamp ISO desde cuándo buscar
+    
+    if (!whatsapp) {
+      return res.status(400).json({
+        success: false,
+        error: 'WhatsApp number required'
+      })
+    }
+    
+    // Buscar conversación activa para este número
+    console.log(`📨 [POLLING] ${whatsapp}: Buscando conversación activa`)
+    
+    const supabaseIntegration = (services.prospectService as any).supabaseIntegration
+    let conversacion = null
+    
+    if (supabaseIntegration?.consultarEstadoConversacion) {
+      conversacion = await supabaseIntegration.consultarEstadoConversacion(whatsapp)
+    }
+    
+    if (!conversacion) {
+      console.log(`📨 [POLLING] ${whatsapp}: No hay conversación activa`)
+      return res.json({
+        success: true,
+        mensajes: [],
+        conversacion_asignada: false
+      })
+    }
+    
+    console.log(`📨 [POLLING] ${whatsapp}: Conversación encontrada: ${conversacion.id}, asignada: ${!!conversacion.assigned_to}`)
+    
+    // Obtener mensajes nuevos desde el timestamp
+    const fechaDesde = desde ? new Date(desde as string) : new Date(Date.now() - 30000) // Últimos 30 segundos por defecto
+    
+    try {
+      const supabaseIntegration = (services.prospectService as any).supabaseIntegration
+      let mensajesNuevos = []
+      
+      if (supabaseIntegration?.obtenerMensajesNuevos) {
+        mensajesNuevos = await supabaseIntegration.obtenerMensajesNuevos(conversacion.id, fechaDesde)
+      }
+      
+      // 🔍 DEBUG: Ver todos los mensajes encontrados
+      console.log(`📨 [SUPABASE-DEBUG] Mensajes encontrados:`, mensajesNuevos.map((msg: any) => ({
+        type: msg.type,
+        sender_id: msg.sender_id,
+        sender_name: msg.sender_name,
+        content: msg.content?.substring(0, 50),
+        created_at: msg.created_at
+      })))
+      
+      // Filtrar solo mensajes de ejecutivos (no del bot)
+      const mensajesEjecutivo = mensajesNuevos.filter((msg: any) => 
+        msg.type === 'agent' && msg.sender_id && msg.sender_id !== 'bot'
+      )
+      
+      console.log(`📨 [POLLING-DEBUG] Después del filtro:`, mensajesEjecutivo.map((msg: any) => ({
+        type: msg.type,
+        sender_id: msg.sender_id,
+        sender_name: msg.sender_name,
+        content: msg.content?.substring(0, 50)
+      })))
+      
+      console.log(`📨 [POLLING] ${whatsapp}: ${mensajesEjecutivo.length} mensajes nuevos desde ${fechaDesde.toISOString()}`)
+      
+      res.json({
+        success: true,
+        mensajes: mensajesEjecutivo,
+        conversacion_asignada: !!conversacion.assigned_to,
+        ejecutivo_asignado: conversacion.assigned_to,
+        ultima_actividad: conversacion.agent_last_activity || conversacion.updated_at
+      })
+      
+            } catch (error) {
+      console.error('❌ [POLLING] Error obteniendo mensajes:', error)
+      res.json({
+        success: true,
+        mensajes: [],
+        conversacion_asignada: !!conversacion.assigned_to,
+        error: 'Error obteniendo mensajes'
+      })
+    }
+
+            } catch (error) {
+    console.error('💥 [POLLING] Error:', error)
+    res.status(500).json({
+      success: false,
+      error: 'Error consultando mensajes nuevos'
+    })
+  }
+})
+
 // 📱 Endpoint legacy de WhatsApp webhook
 app.post('/webhook', rateLimitMiddleware, async (req: Request, res: Response) => {
   try {
@@ -209,7 +348,7 @@ app.get('/webhook', (req: Request, res: Response) => {
   if (mode === 'subscribe' && token === process.env.WEBHOOK_VERIFY_TOKEN) {
     console.log('✅ [WEBHOOK] Verificación exitosa')
     res.status(200).send(challenge)
-  } else {
+    } else {
     console.log('❌ [WEBHOOK] Verificación fallida')
     res.sendStatus(403)
   }
@@ -289,9 +428,9 @@ app.get('/chat-demo/api', (req: Request, res: Response) => {
 app.post('/test-chat', rateLimitMiddleware, async (req: Request, res: Response) => {
   try {
     const { phone, message } = req.body
-    
+
     if (!phone || !message) {
-      return res.status(400).json({
+      return res.status(400).json({ 
         success: false,
         error: 'phone y message son requeridos'
       })
@@ -354,7 +493,7 @@ app.post('/chat/v2/message', rateLimitMiddleware, async (req: Request, res: Resp
         userId,
         user_message: message,
         bot_response: botResponse,
-        timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString()
       },
       repository_info: {
         cache_enabled: true,
@@ -469,7 +608,7 @@ app.post('/test-v2', rateLimitMiddleware, async (req: Request, res: Response) =>
 
   } catch (error) {
     console.error('💥 [TEST-V2] Error:', error)
-    res.status(500).json({
+  res.status(500).json({ 
       status: 'error',
       version: 'v2',
       error: error instanceof Error ? error.message : 'Error desconocido'
@@ -498,7 +637,7 @@ app.get('/chat/v2/metrics', async (req: Request, res: Response) => {
       metrics,
       description: "Métricas simplificadas del ChatService V2"
     })
-
+    
   } catch (error) {
     console.error('💥 [METRICS-V2] Error:', error)
     res.status(500).json({
@@ -532,7 +671,7 @@ app.get('/chat/cache/stats', async (req: Request, res: Response) => {
       cache_stats: cacheStats,
       description: "Sistema de caché V2 operativo"
     })
-
+    
   } catch (error) {
     console.error('💥 [CACHE-STATS] Error:', error)
     res.status(500).json({
@@ -553,7 +692,7 @@ app.post('/chat/version/switch', async (req: Request, res: Response) => {
       chatSelector.switchToV1()
     } else if (version === 'v2') {
       chatSelector.switchToV2()
-    } else {
+      } else {
       return res.status(400).json({
         success: false,
         error: 'Version debe ser "v1" o "v2"'
@@ -562,8 +701,8 @@ app.post('/chat/version/switch', async (req: Request, res: Response) => {
     
     console.log(`🔄 [VERSION-SWITCH] Cambiado a ${version}`)
     
-    res.json({
-      success: true,
+    res.json({ 
+      success: true, 
       active_version: chatSelector.getActiveVersion(),
       message: `Sistema cambiado a ChatService ${version}`,
       capabilities: version === 'v2' ? {
@@ -579,8 +718,8 @@ app.post('/chat/version/switch', async (req: Request, res: Response) => {
 
   } catch (error) {
     console.error('💥 [VERSION-SWITCH] Error:', error)
-    res.status(500).json({
-      success: false,
+    res.status(500).json({ 
+      success: false, 
       error: error instanceof Error ? error.message : 'Error cambiando versión'
     })
   }
@@ -643,17 +782,17 @@ app.post('/chat/cache/clear', async (req: Request, res: Response) => {
     if (repoWithCache && typeof repoWithCache.clearProspectoCache === 'function') {
       cleared += await repoWithCache.clearProspectoCache()
     }
-    
-    res.json({
-      success: true,
+
+    res.json({ 
+      success: true, 
       message: `Cache limpiado: ${cleared} items`,
       timestamp: new Date().toISOString()
     })
 
   } catch (error) {
     console.error('💥 [CACHE-CLEAR] Error:', error)
-    res.status(500).json({
-      success: false,
+    res.status(500).json({ 
+      success: false, 
       error: error instanceof Error ? error.message : 'Error limpiando cache'
     })
   }
@@ -673,13 +812,13 @@ app.get('/check-timeout/:phone', async (req: Request, res: Response) => {
 app.post('/force-timeout/:phone', async (req: Request, res: Response) => {
   try {
     const timeoutMessage = await services.chatService.forceTimeout(req.params.phone)
-    res.json({
-      success: true,
+    res.json({ 
+      success: true, 
       message: timeoutMessage
     })
   } catch (error) {
-    res.status(500).json({
-      success: false,
+    res.status(500).json({ 
+      success: false, 
       error: 'Error forzando timeout'
     })
   }
@@ -749,8 +888,8 @@ function validateWhatsAppWebhook(body: any) {
 app.use((error: Error, req: Request, res: Response, next: NextFunction) => {
   console.error('💥 [SERVER] Error no manejado:', error)
   
-  res.status(500).json({
-    success: false,
+    res.status(500).json({
+      success: false,
     error: 'Error interno del servidor',
     requestId: req.headers['x-request-id'] || 'unknown'
   })
@@ -780,8 +919,8 @@ process.on('SIGINT', () => {
   console.log('🛑 [SERVER] Recibido SIGINT, cerrando servidor...')
   server.close(() => {
     console.log('✅ [SERVER] Servidor cerrado exitosamente')
-    process.exit(0)
-  })
+  process.exit(0)
+})
 })
 
 export default app

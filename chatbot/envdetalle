@@ -45,7 +45,7 @@ CURRENT_PHONE=56912345809  # Número de teléfono para testing del chat demo
 # Configuración de Prisma para conectar con Supabase PostgreSQL
 
 # 📊 DATABASE_URL - Session Pooler (para operaciones normales con Prisma)
-DATABASE_URL="postgresql://postgres:Perrobotill0@db.vtwdmyezyvhprwonengu.supabase.co:5432/postgres"
+DATABASE_URL="postgresql://postgres.vtwdmyezyvhprwonengu:Perrobotill0@aws-1-us-east-2.pooler.supabase.com:5432/postgres"
 
 # 🔗 DIRECT_URL - Direct Connection (para migraciones e introspection)
 DIRECT_URL="postgresql://postgres.vtwdmyezyvhprwonengu:Perrobotill0@aws-1-us-east-2.pooler.supabase.com:5432/postgres"

@@ -154,4 +154,64 @@ export class PrismaConversacionRepository {
       console.error(`❌ [REPO] Error registrando interacción:`, error)
     }
   }
+
+  /**
+   * 🕒 Actualizar timestamp de última actividad del ejecutivo
+   */
+  async updateActivityTimestamp(conversacionId: string, ejecutivoId: string): Promise<void> {
+    try {
+      console.log(`🕒 [REPO] Actualizando actividad: ${conversacionId} → ${ejecutivoId}`)
+      
+      const updated = await this.prisma.conversaciones.update({
+        where: { id: conversacionId },
+        data: {
+          agent_last_activity: new Date(),
+          updated_at: new Date()
+        }
+      })
+
+      console.log(`✅ [REPO] Actividad actualizada: ${updated.id}`)
+    } catch (error) {
+      console.error(`❌ [REPO] Error actualizando actividad:`, error)
+    }
+  }
+
+  /**
+   * 📞 Buscar conversación por número de WhatsApp
+   */
+  async findByWhatsapp(whatsapp: string): Promise<any> {
+    try {
+      console.log(`📞 [REPO] Buscando conversación por WhatsApp: ${whatsapp}`)
+      
+      const conversacion = await this.prisma.conversaciones.findFirst({
+        where: { phone_number: whatsapp },
+        orderBy: { created_at: 'desc' }
+      })
+
+      console.log(`📞 [REPO] Conversación encontrada: ${conversacion ? 'SÍ' : 'NO'}`)
+      return conversacion
+    } catch (error) {
+      console.error(`❌ [REPO] Error buscando conversación:`, error)
+      return null
+    }
+  }
+
+  /**
+   * 🔍 Buscar conversación por ID
+   */
+  async findById(conversacionId: string): Promise<any> {
+    try {
+      console.log(`🔍 [REPO] Buscando conversación por ID: ${conversacionId}`)
+      
+      const conversacion = await this.prisma.conversaciones.findUnique({
+        where: { id: conversacionId }
+      })
+
+      console.log(`🔍 [REPO] Conversación encontrada: ${conversacion ? 'SÍ' : 'NO'}`)
+      return conversacion
+    } catch (error) {
+      console.error(`❌ [REPO] Error buscando conversación por ID:`, error)
+      return null
+    }
+  }
 }

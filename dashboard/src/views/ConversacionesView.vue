@@ -212,11 +212,17 @@ const asignarRapido = async (conversacionId: string, ejecutivoId: string) => {
     if (result.success) {
       console.log('✅ Asignación exitosa:', result.data)
       
-      // 🔄 Recargar conversaciones para actualizar la UI
-      await chat.inicializar()
+      // 🎯 NO MÁS RECARGA COMPLETA - El estado ya se actualiza reactivamente
+      // await chat.inicializar() ❌ ELIMINADO
+      
+      // Buscar nombre del ejecutivo para notificación
+      const ejecutivo = ejecutivos.ejecutivos.value.find(e => e.id === ejecutivoId)
+      const nombreEjecutivo = ejecutivo?.nombre || 'ejecutivo'
       
       // Mostrar notificación de éxito
-      alert(`✅ Conversación asignada exitosamente a ${result.data.ejecutivo_asignado?.nombre || 'ejecutivo'}`)
+      alert(`✅ Conversación asignada exitosamente a ${nombreEjecutivo}`)
+      
+      console.log(`🔄 [REACTIVE] UI actualizada automáticamente sin fetch completo`)
     } else {
       console.error('❌ Error en asignación:', result.error)
       alert(`Error al asignar: ${result.error}`)
@@ -240,8 +246,9 @@ const closeRespuestaModal = () => {
 
 const handleMensajeEnviado = async () => {
   closeRespuestaModal()
-  // Refresh data to show updated conversation state
-  await chat.inicializar()
+  // 🎯 NO MÁS RECARGA COMPLETA - Los mensajes ya se agregan reactivamente
+  // await chat.inicializar() ❌ ELIMINADO
+  console.log('💬 [REACTIVE] Mensaje enviado - UI actualizada automáticamente')
 }
 
 // Lifecycle

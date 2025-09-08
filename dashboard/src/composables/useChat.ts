@@ -142,27 +142,84 @@ export function useChat() {
   const enviarMensaje = async (
     sessionId: string, 
     content: string, 
-    type: 'ejecutivo' = 'ejecutivo'
+    type: 'ejecutivo' = 'ejecutivo',
+    ejecutivoData?: { id: string, nombre: string, whatsapp: string }
   ): Promise<ApiResponse<ChatMessage>> => {
     try {
+      loading.value = true
+      
       const mensaje: Partial<ChatMessage> = {
-        session_id: sessionId,
-        type,
+        conversacion_id: sessionId,
+        type: 'agent',
         content,
-        timestamp: new Date().toISOString(),
         message_type: 'text',
-        status: 'sent',
-        is_automated: false
+        sender_id: ejecutivoData?.id || 'unknown',
+        sender_name: ejecutivoData?.nombre || 'Ejecutivo',
+        metadata: {
+          source: 'dashboard',
+          ejecutivo_id: ejecutivoData?.id,
+          whatsapp: ejecutivoData?.whatsapp
+        }
       }
 
-      // Agregar a array local
+      // 1. Guardar en Supabase (tabla mensajes)
+      const { error: supabaseError } = await supabase
+        .from('mensajes')
+        .insert({
+          conversacion_id: sessionId,
+          content: content,
+          type: 'agent', // ✅ Valor correcto según el esquema
+          sender_id: ejecutivoData?.id || 'unknown',
+          sender_name: ejecutivoData?.nombre || 'Ejecutivo',
+          message_type: 'text',
+          metadata: {
+            source: 'dashboard',
+            ejecutivo_id: ejecutivoData?.id,
+            whatsapp: ejecutivoData?.whatsapp
+          }
+        })
+
+      if (supabaseError) {
+        throw supabaseError
+      }
+
+      // 2. NUEVO: Notificar al chatbot (para que aparezca en Vue Chat)
+      if (ejecutivoData?.whatsapp) {
+        try {
+          const chatbotResponse = await fetch('http://localhost:3001/api/mensajes/ejecutivo', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              whatsapp: ejecutivoData.whatsapp,
+              mensaje: content,
+              ejecutivo_id: ejecutivoData.id,
+              ejecutivo_nombre: ejecutivoData.nombre,
+              conversacion_id: sessionId
+            })
+          })
+
+          if (!chatbotResponse.ok) {
+            console.warn('⚠️ [DASHBOARD] Error notificando chatbot:', chatbotResponse.status)
+          } else {
+            console.log('✅ [DASHBOARD] Mensaje enviado al chatbot exitosamente')
+          }
+        } catch (chatbotError) {
+          console.error('❌ [DASHBOARD] Error enviando al chatbot:', chatbotError)
+        }
+      }
+
+      // 3. Agregar a array local
       if (!mensajes.value[sessionId]) {
         mensajes.value[sessionId] = []
       }
       mensajes.value[sessionId].push(mensaje as ChatMessage)
 
+      loading.value = false
       return handleSupabaseSuccess(mensaje as ChatMessage)
     } catch (err) {
+      loading.value = false
       return handleSupabaseError(err)
     }
   }
@@ -440,6 +497,16 @@ export function useChat() {
           usuariosEscribiendo.value[sessionId] = usuariosEscribiendo.value[sessionId].filter(id => id !== userId)
         }
       }, 3000)
+    },
+
+    // 🔄 SISTEMA DE POLLING PARA ACTUALIZACIONES REACTIVAS
+    startPolling: (): void => {
+      // El polling se maneja a nivel de componente para mejor control del ciclo de vida
+      console.log('🔄 [DASHBOARD] Polling puede implementarse a nivel de componente')
+    },
+
+    stopPolling: (): void => {
+      console.log('🛑 [DASHBOARD] Stopping polling (implementar en componente)')
     }
   }
 }
