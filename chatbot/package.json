@@ -35,7 +35,12 @@
     "dev:vue": "vite --config vite.vue.config.ts",
     "dev:vue:watch": "vite build --config vite.vue.config.ts --watch",
     "build:vue": "vite build --config vite.vue.config.ts",
-    "preview:vue": "vite preview --config vite.vue.config.ts"
+    "preview:vue": "vite preview --config vite.vue.config.ts",
+    "simplified:dev": "ts-node --transpile-only src/index-simplified.ts",
+    "simplified:dev:watch": "nodemon --exec ts-node --transpile-only src/index-simplified.ts",
+    "simplified:build": "tsc",
+    "simplified:start": "node dist/index-simplified.js",
+    "simplified:test": "node test-simplified.js"
   },
   "keywords": [
     "chatbot",

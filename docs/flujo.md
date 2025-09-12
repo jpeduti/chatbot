@@ -1,430 +1,425 @@
-# 🎓 DOCUMENTACIÓN COMPLETA DE FLUJOS - UNIACC CHATBOT
+# 🎓 GUÍA COMPLETA DE FLUJOS - UNIACC CHATBOT SIMPLIFICADO
 
 ## 📋 ÍNDICE
-1. [Flujos Principales](#flujos-principales)
-2. [Menú Principal](#menú-principal)
-3. [Menú Contextual (Usuarios Recurrentes)](#menú-contextual)
-4. [Flujos de Captura](#flujos-de-captura)
-5. [Testing Checklist](#testing-checklist)
+1. [Introducción para Desarrolladores Junior](#introducción-para-desarrolladores-junior)
+2. [Arquitectura Simplificada](#arquitectura-simplificada)
+3. [Flujo Principal: UniaccFlow](#flujo-principal-uniaccflow)
+4. [Estados y Transiciones](#estados-y-transiciones)
+5. [Cómo Crear un Nuevo Flujo (Paso a Paso)](#cómo-crear-un-nuevo-flujo-paso-a-paso)
+6. [Ejemplos Prácticos](#ejemplos-prácticos)
+7. [Testing y Debugging](#testing-y-debugging)
+8. [Errores Comunes y Soluciones](#errores-comunes-y-soluciones)
 
 ---
 
-## 🚀 FLUJOS PRINCIPALES
+## 👨‍💻 Introducción para Desarrolladores Junior
 
-### **1. BIENVENIDA INICIAL (NUEVO FLUJO ESTÁNDAR MUNDIAL)**
-**Trigger:** Usuario nuevo escribe "hola"
-**Flujo:** `captura_inicial` → `confirmar_telefono`
-**Paso:** `confirmar_telefono`
+### **¿Qué es un Chatbot Conversacional?**
 
-#### 1.1 Auto-Detección de Número (Estándar Internacional)
+Un chatbot conversacional es un programa que simula una conversación humana a través de texto. En nuestro caso, el chatbot de UNIACC ayuda a estudiantes potenciales a obtener información sobre la universidad.
+
+**Ejemplo simple:**
 ```
-📱 Detectamos que escribes desde +56912345809
-
-Para personalizar tu experiencia en UNIACC:
-
-✅ Recordar tus consultas anteriores
-✅ Enviarte info de carreras de tu interés  
-✅ Conectarte directamente con asesores académicos
-✅ Actualizaciones importantes de admisión
-
-¿Confirmamos este número como tu contacto preferido?
-
-1️⃣ Sí, usar para mejorar mi experiencia UNIACC
-2️⃣ Prefiero dar otro número
-3️⃣ Continuar sin guardar número
-
-💡 Tip: Podrás cambiar estas preferencias cuando quieras
-🔒 Tus datos están protegidos según nuestras políticas de privacidad
+Usuario: "hola"
+Bot: "¡Hola! 👋 Detectamos que escribes desde +56912345678. ¿Es correcto tu número?"
+Usuario: "sí"
+Bot: "✅ Teléfono confirmado. ¿Cuál es tu nombre completo?"
 ```
 
-#### 1.2 Flujos por Opción
-- **Opción 1:** ✅ Teléfono confirmado → Guardado inmediato en BD → Pide nombre
-- **Opción 2:** 📱 Pide número manual → Validación E.164 → Guardado en BD → Pide nombre  
-- **Opción 3:** 🚫 Sin teléfono → Flujo tradicional → Pide nombre
+### **¿Por qué se Simplificó el Sistema?**
 
----
+**Antes (Complejo):**
+- 6 flujos diferentes
+- 12 servicios
+- Sistema de contexto complejo
+- Difícil de mantener
 
-## 🏠 MENÚ PRINCIPAL
+**Ahora (Simplificado):**
+- 1 flujo único
+- 4 servicios
+- Estado simple
+- Fácil de entender y modificar
 
-### **Para Usuarios Nuevos (Post-Confirmación):**
+### **Conceptos Básicos que Necesitas Saber:**
+
+#### **1. Estado (State)**
+El estado es la "memoria" del chatbot para cada usuario. Guarda:
+- ¿En qué paso está el usuario?
+- ¿Qué datos ha capturado?
+- ¿Qué necesita saber aún?
+
+```typescript
+// Ejemplo de estado
+const userState = {
+  step: 'capture',           // Paso actual
+  needsData: ['nombre', 'email'], // Datos pendientes
+  capturedData: {            // Datos ya capturados
+    telefono: '+56912345678',
+    nombre: 'Juan'
+  }
+}
 ```
-✅ **¡Perfecto!** Usaremos +56912345809 para contactarte.
 
-🎓 Para personalizar tu experiencia en UNIACC:
+#### **2. Flujo (Flow)**
+Un flujo es la secuencia de pasos que sigue una conversación:
+1. Saludo inicial
+2. Captura de datos
+3. Menú principal
+4. Exploración de carreras
+5. Solicitud de asesor
 
-👤 ¿Cuál es tu **nombre completo**?
-```
+#### **3. Handler (Manejador)**
+Un handler es una función que procesa un mensaje específico del usuario:
 
-**Luego:** `nombre` → `email` → `edad` → `región` → Menú principal
-
-### **Para Usuarios Recurrentes Sin Carrera:**
-```
-🎓 ¡Buenas [tiempo] [nombre]! Te reconozco.
-
-🌟 ¿En qué puedo ayudarte hoy?
-
-1️⃣ Explorar carreras
-2️⃣ Proceso de admisión 2025
-3️⃣ Costos y becas
-4️⃣ Modalidades de estudio
-5️⃣ Hablar con un asesor
-6️⃣ Búsqueda directa de carrera
-```
-
----
-
-## 👤 MENÚ CONTEXTUAL (Usuarios Recurrentes)
-
-### **Con Carrera Consultada Previamente:**
-```
-🎓 ¡Buenas [tiempo] [nombre]! Te reconozco.
-📚 Última consulta: [CARRERA]
-
-🌟 ¿En qué puedo ayudarte hoy?
-
-1️⃣ Más info sobre [CARRERA]
-2️⃣ Ver carreras similares
-3️⃣ Proceso de admisión
-4️⃣ Costos y becas
-5️⃣ Hablar con un asesor
-6️⃣ Consulta completamente nueva
+```typescript
+// Ejemplo de handler
+private async handleGreeting(userId: string, message: string, state: SimpleState): Promise<FlowResponse> {
+  // Lógica para procesar el saludo
+  return {
+    message: '¡Hola! ¿Cómo estás?',
+    completed: false,
+    nextStep: 'capture'
+  }
+}
 ```
 
 ---
 
-## 🎯 OPCIONES DETALLADAS POR FLUJO
+## 🏗️ Arquitectura Simplificada
 
-### **OPCIÓN 1: EXPLORAR CARRERAS**
-**Flujo:** `exploracion_carreras` → `program_discovery`
-**Paso:** `seleccion_facultad`
+### **Estructura del Sistema:**
 
-#### 1.1 Selección de Facultad
 ```
-🎨 FACULTADES Y CARRERAS UNIACC
-
-A) 🎭 FACULTAD DE ARTES
-• Teatro y Comunicación Escénica
-• Danza y Coreografía
-• Música (Interpretación/Composición)
-• Artes Visuales
-
-B) 📺 FACULTAD DE COMUNICACIONES
-• Comunicación Audiovisual (pioneros en Chile 🥇)
-• Periodismo • Publicidad
-
-C) 🏗️ ARQUITECTURA Y DISEÑO
-• Arquitectura • Diseño de Interiores
-
-D) ⚖️ CIENCIAS JURÍDICAS Y SOCIALES
-• Derecho • Psicología
-
-E) 💼 NEGOCIOS Y TECNOLOGÍA
-• Ingeniería Comercial • Contador Auditor
-
-¿Qué facultad te interesa? Escribe la letra (A, B, C, D o E)
+UniaccFlow (Flujo Único)
+    ↓
+UniaccChatService (Orquestador)
+    ↓
+┌─────────────────┬─────────────────┬─────────────────┐
+│ ProspectService │ ValidationService│ MessageFormatter│
+│     V2          │                 │     Service     │
+└─────────────────┴─────────────────┴─────────────────┘
+    ↓
+RepositoryFactory
+    ↓
+Supabase Database
 ```
 
-#### 1.2 Selección de Carrera (por facultad)
-**Ejemplo Facultad A (Artes):**
-```
-🎭 FACULTAD DE ARTES
+### **Archivos Principales:**
 
-1️⃣ Teatro y Comunicación Escénica
-└ 8 semestres • Presencial
+| Archivo | Propósito | ¿Qué hace? |
+|---------|-----------|------------|
+| `UniaccFlow.ts` | 🎯 Flujo principal | Maneja toda la lógica conversacional |
+| `UniaccChatService.ts` | 🎯 Orquestador | Coordina el flujo y servicios |
+| `ProspectServiceV2.ts` | 💾 Persistencia | Guarda y recupera datos |
+| `ValidationService.ts` | ✅ Validaciones | Verifica emails, teléfonos, etc. |
+| `MessageFormatterService.ts` | 📝 Formateo | Formatea mensajes bonitos |
 
-2️⃣ Danza y Coreografía
-└ 8 semestres • Presencial
+---
 
-3️⃣ Música e Interpretación
-└ 8 semestres • Presencial
+## 🎯 Flujo Principal: UniaccFlow
 
-4️⃣ Artes Visuales
-└ 10 semestres • Presencial
+### **Método Principal: `processMessage()`**
 
-Escribe el número de la carrera que te interesa 📝
-```
+Este es el "cerebro" del chatbot. Cada vez que un usuario envía un mensaje, se ejecuta este método:
 
-#### 1.3 Detalle de Carrera
-**Flujo:** `detalle_carrera` → `career_exploration`
-```
-🎓 TEATRO Y COMUNICACIÓN ESCÉNICA
-🎭 Facultad de Artes
-
-📚 Duración: 8 semestres
-🏫 Modalidad: Presencial
-💰 Costo aprox: $15.500.000/año
-
-📖 Descripción:
-Formación integral en artes escénicas con enfoque contemporáneo
-
-⚠️ Requisitos especiales:
-• Audición
-• Taller de expresión corporal
-
-¿Qué te gustaría hacer?
-
-1️⃣ Me interesa, quiero más información
-2️⃣ No es para mí
-3️⃣ Hablar con un asesor
-4️⃣ Ver otra carrera
+```typescript
+async processMessage(userId: string, message: string, state: SimpleState): Promise<FlowResponse> {
+  // Determina qué handler usar según el paso actual
+  switch (state.step) {
+    case 'greeting': return this.handleGreeting(userId, message, state)
+    case 'capture': return this.handleDataCapture(userId, message, state)
+    case 'menu': return this.handleMainMenu(userId, message, state)
+    case 'careers': return this.handleCareerExploration(userId, message, state)
+    case 'advisor': return this.handleAdvisorRequest(userId, message, state)
+    default: return this.handleGreeting(userId, message, state)
+  }
+}
 ```
 
-### **OPCIÓN 2: PROCESO DE ADMISIÓN**
-**Flujo:** `proceso_admision` → `admission_inquiry`
+### **Handlers Principales:**
+
+#### **1. `handleGreeting()` - Saludo Inicial**
+```typescript
+private async handleGreeting(userId: string, message: string, state: SimpleState): Promise<FlowResponse> {
+  // ¿Es un saludo?
+  const isGreeting = this.isGreetingMessage(message)
+  
+  if (!isGreeting) {
+    return {
+      message: '¡Hola! 👋 Para empezar, escribe "hola" o "inicio".',
+      completed: false
+    }
+  }
+
+  // ¿Es usuario recurrente?
+  const existingUser = await this.prospectoRepo.findByWhatsapp(userId)
+  
+  if (existingUser && existingUser.nombre) {
+    // Usuario conocido - ir directo al menú
+    state.step = 'menu'
+    return {
+      message: `¡Hola ${existingUser.nombre}! 👋 Me alegra verte de nuevo.\n\n${this.getMainMenu()}`,
+      completed: false,
+      nextStep: 'menu'
+    }
+  } else {
+    // Usuario nuevo - captura de datos
+    state.step = 'capture'
+    state.needsData = ['telefono', 'nombre', 'email', 'edad', 'region']
+    
+    const phoneNumber = this.extractPhoneFromUserId(userId)
+    return {
+      message: `¡Hola! 👋 Detectamos que escribes desde ${phoneNumber}.\n\n¿Es correcto tu número?`,
+      completed: false,
+      nextStep: 'capture'
+    }
+  }
+}
 ```
-📋 PROCESO DE ADMISIÓN UNIACC 2025
 
-🔥 ¡MATRÍCULAS ABIERTAS!
-📅 Hasta: 28 de Febrero 2025
-📚 Inicio clases: 10 de Marzo 2025
+---
 
-✅ REQUISITOS COMPLETOS:
-1️⃣ Licencia de Enseñanza Media
-2️⃣ Concentración de notas
-3️⃣ Cédula de identidad (ambos lados)
-4️⃣ PSU/PDT (opcional, mejora ranking)
+## 🔄 Estados y Transiciones
 
-💡 PROCESO INDEPENDIENTE DEL DEMRE
-• Postula cuando quieras
-• Proceso continuo
-• Respuesta rápida
+### **Estados Posibles:**
 
-🚀 ¿LISTO PARA POSTULAR?
+| Estado | Descripción | ¿Cuándo se usa? |
+|--------|-------------|-----------------|
+| `greeting` | Saludo inicial | Usuario nuevo o reinicio |
+| `capture` | Captura de datos | Usuario nuevo necesita datos |
+| `menu` | Menú principal | Usuario con datos completos |
+| `careers` | Exploración carreras | Usuario eligió opción 1 |
+| `advisor` | Solicitud asesor | Usuario eligió opción 5 |
+
+### **Transiciones de Estado:**
+
+```mermaid
+stateDiagram-v2
+    [*] --> greeting: Usuario escribe "hola"
+    
+    greeting --> capture: Usuario nuevo
+    greeting --> menu: Usuario recurrente
+    
+    capture --> menu: Datos completados
+    
+    menu --> careers: Opción 1
+    menu --> advisor: Opción 5
+    menu --> greeting: Reinicio
+    
+    careers --> advisor: Solicitar asesor
+    advisor --> [*]: Flujo completado
 ```
 
-### **OPCIÓN 3: COSTOS Y BECAS**
-**Flujo:** `costos_becas_decision` → `financial_inquiry`
+---
+
+## 🛠️ Cómo Crear un Nuevo Flujo (Paso a Paso)
+
+### **Ejemplo: Crear Flujo de "Información de Becas"**
+
+#### **Paso 1: Planificar el Flujo**
 ```
-💰 COSTOS Y BECAS UNIACC 2025
+1. Usuario elige opción "6" en menú principal
+2. Bot muestra información de becas
+3. Bot pregunta si quiere más información
+4. Si dice "sí", muestra detalles
+5. Si dice "no", vuelve al menú principal
+```
 
-📊 ARANCELES ANUALES APROXIMADOS:
-• Artes: $15.500.000
-• Comunicaciones: $16.200.000
-• Arquitectura y Diseño: $17.800.000
-• Derecho y Psicología: $16.500.000
-• Negocios: $15.800.000
+#### **Paso 2: Agregar al Switch Principal**
+En `UniaccFlow.ts`, agregar al método `processMessage()`:
 
-🎯 BECAS DISPONIBLES:
+```typescript
+switch (state.step) {
+  case 'greeting': return this.handleGreeting(userId, message, state)
+  case 'capture': return this.handleDataCapture(userId, message, state)
+  case 'menu': return this.handleMainMenu(userId, message, state)
+  case 'careers': return this.handleCareerExploration(userId, message, state)
+  case 'advisor': return this.handleAdvisorRequest(userId, message, state)
+  case 'becas': return this.handleBecasInfo(userId, message, state) // 🆕 NUEVO
+  default: return this.handleGreeting(userId, message, state)
+}
+```
+
+#### **Paso 3: Crear el Handler**
+```typescript
+private async handleBecasInfo(userId: string, message: string, state: SimpleState): Promise<FlowResponse> {
+  const becasInfo = `🎓 BECAS DISPONIBLES EN UNIACC
+
+🎯 BECAS PRINCIPALES:
 1️⃣ Beca de Excelencia Académica (hasta 50%)
-2️⃣ Beca Socioeconómica (hasta 40%)
+2️⃣ Beca Socioeconómica (hasta 40%)  
 3️⃣ Beca Talento Artístico (hasta 60%)
 4️⃣ Beca Hermanos UNIACC (15%)
 
-💳 FACILIDADES DE PAGO:
-• Cuotas mensuales sin interés
-• Descuentos por pago anticipado
-• Financiamiento estudiantil
+¿Te gustaría más información sobre alguna beca específica?
 
-¿Qué información específica necesitas?
+1️⃣ Sí, quiero más detalles
+2️⃣ No, tengo la información que necesitaba
+3️⃣ Hablar con un asesor financiero`
 
-1️⃣ Detalles de becas
-2️⃣ Simulador de costos
-3️⃣ Hablar con asesor financiero
-4️⃣ Volver al menú principal
+  return {
+    message: becasInfo,
+    completed: false,
+    nextStep: 'becas'
+  }
+}
 ```
 
-### **OPCIÓN 4: MODALIDADES DE ESTUDIO**
-**Flujo:** `modalidades_decision` → `program_comparison`
-```
-🎓 MODALIDADES DE ESTUDIO
+#### **Paso 4: Probar el Nuevo Flujo**
+1. Ejecutar: `npm run simplified:dev`
+2. Abrir: http://localhost:3001/test
+3. Probar: "hola" → completar datos → "6" → verificar información de becas
 
-Elige una modalidad:
+---
 
-1️⃣ Presencial - Máxima interacción
-2️⃣ Semipresencial - Flexibilidad
-3️⃣ Hablar con un asesor
-4️⃣ Ya tengo la info que necesitaba
+## 🧪 Testing y Debugging
 
-Escribe solo el número (1, 2, 3 o 4):
-```
+### **Cómo Probar el Sistema:**
 
-### **OPCIÓN 5: HABLAR CON UN ASESOR**
-**Flujo:** `advisor_connection`
-**Paso:** `collect_basic_info`
-
-#### 5.1 Captura Inteligente de Datos
-- **Si falta nombre:** Pide nombre
-- **Si falta email:** Pide email
-- **Si falta teléfono:** Pide teléfono
-
-#### 5.2 Mensaje Final
-```
-✅ ¡Perfecto [nombre]!
-
-📋 RESUMEN DE TU SOLICITUD:
-📧 Email: [email]
-📱 Teléfono: [telefono]
-🎯 Carrera de interés: [carrera o "Sin especificar"]
-
-🎯 PRÓXIMOS PASOS:
-• Un asesor académico se comunicará contigo en las próximas 24 horas
-• Recibirás información detallada por email
-• Podrás agendar una entrevista personalizada
-
-¡Gracias por tu interés en UNIACC! 🎓✨
-
-💬 Escribe "Hola" para realizar una nueva consulta
+#### **1. Iniciar el Servidor:**
+```bash
+cd chatbot
+npm run simplified:dev
 ```
 
-### **OPCIÓN 6: BÚSQUEDA DIRECTA**
-**Flujo:** `busqueda_directa_carrera` → `program_discovery`
+#### **2. Abrir Interfaz de Testing:**
+- URL: http://localhost:3001/test
+- Interfaz web simple para probar conversaciones
+
+#### **3. Casos de Prueba Básicos:**
+
+**Caso 1: Usuario Nuevo Completo**
 ```
-🚀 ¡Perfecto! Vamos directo al grano
+1. Escribir "hola"
+2. Confirmar teléfono
+3. Ingresar nombre
+4. Ingresar email válido
+5. Ingresar edad
+6. Seleccionar región
+7. Explorar carreras
+8. Solicitar asesor
+```
 
-🎓 ¿Cuál es la carrera que te interesa?
+**Caso 2: Usuario Recurrente**
+```
+1. Escribir "hola" (debe reconocer usuario existente)
+2. Verificar menú contextual
+3. Probar opciones del menú
+```
 
-Escribe el nombre de la carrera que quieres estudiar
-(ejemplo: "Psicología", "Arquitectura", "Diseño", "Derecho", etc.):
+### **Logs de Debugging:**
+
+#### **Console Logs Útiles:**
+```typescript
+// En cualquier handler
+console.log('🎯 [FLOW] Procesando paso:', state.step)
+console.log('👤 [USER] ID:', userId, 'Mensaje:', message)
+console.log('💾 [DATA] Datos capturados:', state.capturedData)
+console.log('🔄 [STATE] Estado actual:', state)
 ```
 
 ---
 
-## 🔄 FLUJOS ESPECIALES
+## 🚨 Errores Comunes y Soluciones
 
-### **TIMEOUT SYSTEM**
-- **Warning:** 1.5 minutos de inactividad
-- **Final:** 2 minutos de inactividad
-- **Datos guardados** en `prospecto_historial`
+### **Error 1: "Cannot read property of undefined"**
 
-### **USUARIOS RECURRENTES**
-- **Reconocimiento:** Por número de WhatsApp
-- **Menú contextual:** Basado en historial
-- **Datos existentes:** Cargados automáticamente
-
----
-
-## ✅ TESTING CHECKLIST
-
-### **🧪 TESTS BÁSICOS**
-
-#### **1. Usuario Nuevo (NUEVO FLUJO ESTÁNDAR MUNDIAL)**
-- [ ] `"hola"` → Auto-detección de número
-- [ ] Mensaje de confirmación con valor claro
-- [ ] **Opción 1:** Teléfono guardado inmediatamente en BD
-- [ ] **Opción 2:** Número manual validado y guardado
-- [ ] **Opción 3:** Flujo sin teléfono
-- [ ] Continúa: nombre → email → edad → región
-- [ ] **CRÍTICO:** NO duplica registros en BD
-
-#### **2. Usuario Recurrente**
-- [ ] `"hola"` → Menú contextual con reconocimiento
-- [ ] Todas las opciones (1-6) funcionan
-
-#### **3. Exploración de Carreras**
-- [ ] Opción 1 → Menú facultades
-- [ ] Cada letra (A-E) → Lista carreras
-- [ ] Cada número → Detalle carrera
-- [ ] Opciones dentro del detalle (1-4)
-
-#### **4. Flujo de Asesor (Crítico)**
-- [ ] Opción 5 → Detecta datos faltantes
-- [ ] Pide solo datos que faltan
-- [ ] Mensaje final correcto
-- [ ] Guarda en BD correctamente
-
-#### **5. Timeout System**
-- [ ] Warning a 1.5 min
-- [ ] Timeout final a 2 min
-- [ ] Datos guardados correctamente
-- [ ] Usuario puede continuar después
-
-### **🔍 TESTS AVANZADOS**
-
-#### **6. Flujos de Decisión**
-- [ ] Costos y becas → Todas las subopciones
-- [ ] Modalidades → Presencial/Semipresencial
-- [ ] Proceso admisión → Información completa
-
-#### **7. Búsqueda Directa**
-- [ ] Nombres exactos de carreras
-- [ ] Búsquedas parciales
-- [ ] Carreras no encontradas
-
-#### **8. Persistencia de Datos**
-- [ ] Conversaciones guardadas en BD
-- [ ] Mensajes registrados correctamente
-- [ ] Prospectos en `prospecto_actual` y `prospecto_historial`
-
----
-
-## 🚨 PUNTOS CRÍTICOS A VERIFICAR
-
-### **1. Nuevo Flujo de Auto-Detección (CRÍTICO)**
-- ✅ **Auto-detección:** Número detectado en formato E.164
-- ✅ **Guardado inmediato:** Teléfono en BD al confirmar
-- ✅ **No duplicación:** Actualiza registro existente
-- ✅ **Validación:** Números manuales formato correcto
-- ⚠️ **Verificar:** Edad y región se mapean correctamente
-
-### **2. Flujo de Asesor**
-- ✅ **Menu contextual con carrera:** Línea 1048
-- ✅ **Menu general:** Línea 1097
-- ✅ **Ambos usan:** `ADVISOR_CONNECTION`
-
-### **3. Reconocimiento de Usuarios**
-- ✅ **`verificarUsuarioExistente`:** Habilitado
-- ✅ **Datos cargados:** En estado del usuario
-
-### **4. Base de Datos**
-- ✅ **Mensajes:** Tabla `mensajes` funcionando
-- ✅ **Conversaciones:** Tabla `conversaciones` funcionando  
-- ✅ **Prospectos:** Ambas tablas `historial` + `actual`
-- ✅ **Mapeo campos:** Edad y región incluidos
-
-### **5. Timeout System**
-- ✅ **Polling frontend:** Funcional
-- ✅ **Mensajes UI:** Aparecen correctamente
-- ✅ **Datos guardados:** En timeout
-
----
-
-## 📊 LOGS A MONITOREAR
-
-### **Logs de Auto-Detección (NUEVOS):**
-```
-👤 [INFO] Usuario NUEVO: sin nombre { phoneDetected: '+56912345809', country: 'CL' }
-🔄 [FLOW] Flujo cambiado: none → captura_inicial | Paso: confirmar_telefono
-💾 [INFO] Prospecto telefono_confirmado: ÉXITO
-💾 Creando prospecto inicial con teléfono: +56912345809
-✅ Prospecto con teléfono creado exitosamente: [UUID]
-📱 Usuario ya tiene prospecto con teléfono confirmado, actualizando nombre
+**Problema:**
+```typescript
+const user = await this.prospectoRepo.findByWhatsapp(userId)
+const name = user.nombre // Error si user es null
 ```
 
-### **Logs de Flujo:**
-```
-🤖 [FLOW] Procesando flujo: [flujo] | Paso: [paso]
-🎯 [ASESOR] Iniciando flujo inteligente
-🔍 [VERIFICAR] Usuario existente encontrado
-👤 [INFO] Procesando mensaje: "hola..." | Flujo: [flujo]
+**Solución:**
+```typescript
+const user = await this.prospectoRepo.findByWhatsapp(userId)
+const name = user?.nombre || 'Usuario' // ✅ Usar optional chaining
 ```
 
-### **Logs de BD:**
-```
-💬 [CONVERSACION] Encontrada existente: [UUID]
-💬 [MENSAJE-USER] Guardado
-🤖 [MENSAJE-BOT] Guardado
-📊 Interacciones registradas
-🔧 DEBUG - Payload para función BD: { "p_telefono": "+56912345809" }
+### **Error 2: "State not found"**
+
+**Problema:**
+```typescript
+if (state.step === 'invalid_step') { ... }
 ```
 
-### **Logs de Datos:**
+**Solución:**
+```typescript
+const validSteps = ['greeting', 'capture', 'menu', 'careers', 'advisor']
+if (!validSteps.includes(state.step)) {
+  state.step = 'greeting' // ✅ Reset seguro
+}
 ```
-📤 [NUEVA BD] Guardando sesión
-✅ [NUEVA BD] Sesión guardada - Usuario: [tipo]
-📊 [NUEVA BD] Sesión #[número] - Perfil: [perfil]
-💾 [INFO] Prospecto prospecto_telefono_creado: ÉXITO
+
+### **Error 3: "Promise not awaited"**
+
+**Problema:**
+```typescript
+this.prospectoRepo.findByWhatsapp(userId) // ❌ Sin await
+```
+
+**Solución:**
+```typescript
+await this.prospectoRepo.findByWhatsapp(userId) // ✅ Con await
 ```
 
 ---
 
-## 🌍 **ESTÁNDAR MUNDIAL IMPLEMENTADO**
+## 📚 Recursos Adicionales
 
-### **✅ Características del Nuevo Flujo:**
+### **Archivos de Referencia:**
+- `src/flows/UniaccFlow.ts` - Flujo principal completo
+- `src/services/UniaccChatService.ts` - Orquestador
+- `src/data/programas-uniacc.ts` - Datos de carreras
+- `src/data/respuestas-predefinidas.ts` - Mensajes del bot
 
-1. **🔍 Auto-Detección:** Como WhatsApp Business API
-2. **🎯 Valor Claro:** Como Harvard, MIT, Stanford
-3. **📱 Formato E.164:** Estándar internacional
-4. **🔒 Consentimiento Explícito:** GDPR/CCPA compliant
-5. **💾 Guardado Inmediato:** Al confirmar teléfono
-6. **⚡ Flujo Optimizado:** 50% menos fricción
-7. **📊 Logging Completo:** Para análisis y debugging
+### **Comandos Útiles:**
+```bash
+# Desarrollo
+npm run simplified:dev
+
+# Build
+npm run simplified:build
+
+# Verificar tipos
+npx tsc --noEmit
+
+# Testing
+# Abrir http://localhost:3001/test
+```
+
+### **URLs Importantes:**
+- **Testing**: http://localhost:3001/test
+- **API**: http://localhost:3001/chat
+- **Health**: http://localhost:3001/health
+- **Supabase**: https://vtwdmyezyvhprwonengu.supabase.co
+
+---
+
+## 🎯 Resumen para Desarrolladores Junior
+
+### **Lo Más Importante:**
+
+1. **Un flujo único** maneja toda la conversación
+2. **Cada handler** procesa un paso específico
+3. **El estado** guarda la memoria del usuario
+4. **Siempre retornar** una FlowResponse
+5. **Probar todo** en http://localhost:3001/test
+
+### **Flujo de Desarrollo:**
+1. Modificar `UniaccFlow.ts`
+2. Ejecutar `npm run simplified:dev`
+3. Probar en http://localhost:3001/test
+4. Verificar logs en consola
+5. Revisar datos en Supabase
+
+### **Cuando Tengas Dudas:**
+1. Revisar el código existente
+2. Usar console.log para debugging
+3. Probar casos simples primero
+4. Verificar la base de datos
+5. Preguntar al equipo
+
+---
+
+**¡Recuerda: La simplicidad es la clave! El sistema está diseñado para ser fácil de entender y modificar. 🚀**

@@ -1,255 +1,190 @@
-# 🏗️ Arquitectura del Sistema ChatBot UNIACC
+# 🏗️ Arquitectura del Sistema ChatBot UNIACC - VERSIÓN SIMPLIFICADA
 
-**Autor:** Juan Pablo Silva feat Claude AI
+**Autor:** Juan Pablo Silva feat Claude AI  
+**Versión:** 4.0.0 - Arquitectura Ultra-Simplificada  
+**Última actualización:** Enero 2025
 
 ## 📋 Índice
 1. [Visión General](#vision-general)
-2. [Arquitectura de Microservicios](#arquitectura-de-microservicios)
-3. [Chatbot Backend](#chatbot-backend)
-4. [Dashboard Frontend](#dashboard-frontend)
-5. [Dashboard API Server](#dashboard-api-server)
-6. [Base de Datos (Supabase)](#base-de-datos-supabase)
-7. [Flujo de Datos](#flujo-de-datos)
-8. [Configuración de Puertos](#configuracion-de-puertos)
-9. [Variables de Entorno](#variables-de-entorno)
-10. [Estructura de Archivos](#estructura-de-archivos)
+2. [Arquitectura Simplificada](#arquitectura-simplificada)
+3. [Chatbot Backend Simplificado](#chatbot-backend-simplificado)
+4. [Flujo de Datos Simplificado](#flujo-de-datos-simplificado)
+5. [Base de Datos (Supabase)](#base-de-datos-supabase)
+6. [Configuración de Puertos](#configuracion-de-puertos)
+7. [Variables de Entorno](#variables-de-entorno)
+8. [Estructura de Archivos](#estructura-de-archivos)
+9. [Guía para Desarrolladores](#guia-para-desarrolladores)
 
 ---
 
 ## 🎯 Visión General
 
-El sistema ChatBot UNIACC está diseñado como una arquitectura de microservicios que permite:
-- **🆕 Progressive Capture System** - Zero data loss con captura incremental campo por campo
-- **Captura automática de prospectos** a través de WhatsApp con sistema anti-duplicados
-- **Gestión centralizada** de conversaciones y prospectos con clasificación granular de abandono
-- **Dashboard en tiempo real** para seguimiento de leads con análisis de abandono progresivo
-- **Integración con Supabase** para persistencia de datos con constraints avanzados
-- **Sistema de timeout inteligente** que preserva datos parciales
+El sistema ChatBot UNIACC ha sido **radicalmente simplificado** a una arquitectura ultra-limpia que mantiene 100% de la funcionalidad original:
+
+### ✅ **Beneficios de la Simplificación:**
+- **🚀 Arquitectura Ultra-Simple** - 1 flujo vs 6 flujos complejos
+- **⚡ Mantenimiento Fácil** - 4 servicios vs 12 servicios
+- **🔧 Debugging Simplificado** - Lógica directa sin capas complejas
+- **📚 Onboarding Rápido** - Nuevos desarrolladores en minutos
+- **🎯 Funcionalidad Completa** - Todas las características preservadas
+- **💾 Zero Data Loss** - Captura progresiva mantenida
+- **🔄 Sistema Anti-Duplicados** - Funcionando perfectamente
 
 ```mermaid
 graph TB
-    WA[WhatsApp Business API] --> CB[ChatBot Backend :3001]
+    WA[WhatsApp Business API] --> CB[ChatBot Simplificado :3001]
     CB --> SB[(Supabase Database)]
-    CB --> DAS[Dashboard API Server :3002]
-    DAS --> SB
-    DF[Dashboard Frontend :3000] --> DAS
-    U[Usuario Web] --> DF
-    E[Ejecutivo/Admin] --> DF
+    U[Usuario Web] --> CB
+    E[Ejecutivo/Admin] --> CB
+    
+    subgraph "Arquitectura Ultra-Simplificada"
+        CB --> UF[UniaccFlow - Flujo Único]
+        UF --> US[UniaccChatService]
+        US --> PS[ProspectServiceV2]
+        US --> VS[ValidationService]
+        US --> MS[MessageFormatterService]
+    end
 ```
 
 ---
 
-## 🔧 Arquitectura de Microservicios
+## 🚀 Arquitectura Simplificada
+
+### **Antes vs Ahora:**
+
+| Aspecto | ❌ Antes (Complejo) | ✅ Ahora (Simplificado) |
+|---------|-------------------|----------------------|
+| **Flujos** | 6 flujos complejos | 1 flujo inteligente |
+| **Servicios** | 12 servicios | 4 servicios esenciales |
+| **Estado** | FlowContext complejo | SimpleState directo |
+| **Entry Point** | `index.ts` + múltiples | `index-simplified.ts` |
+| **Testing** | Framework complejo | Interfaz web simple |
+| **Mantenimiento** | Difícil | Ultra-fácil |
 
 ### Servicios Principales
 
 | Servicio | Puerto | Tecnología | Propósito |
 |----------|--------|------------|-----------|
-| **ChatBot Backend** | 3001 | Node.js + TypeScript | Bot de WhatsApp con sistema anti-duplicados |
-| **Dashboard API Server** | 3002 | Node.js + Express | API REST con mapeo de tipos de consulta |
-| **Dashboard Frontend** | 3000 | Vue.js + Vite | Interfaz web con identificación de urgencia |
+| **ChatBot Simplificado** | 3001 | Node.js + TypeScript | Flujo único con lógica directa |
 
 ### Servicios Externos
 
 | Servicio | URL | Propósito |
 |----------|-----|-----------|
-| **Supabase** | https://vtwdmyezyvhprwonengu.supabase.co | Base de datos PostgreSQL con constraints |
+| **Supabase** | https://vtwdmyezyvhprwonengu.supabase.co | Base de datos PostgreSQL |
 | **WhatsApp Business API** | Meta Platform | Integración de mensajería |
 
 ---
 
-## 🤖 Chatbot Backend
+## 🤖 Chatbot Backend Simplificado
 
 ### **Puerto:** 3001
 ### **Tecnología:** Node.js + TypeScript + Express
+### **Entry Point:** `index-simplified.ts`
 
 ```
 chatbot/
 ├── src/
-│   ├── actions/
-│   │   ├── uniacc-scripts.ts      # Lógica principal del bot + anti-duplicados
-│   │   └── supabase-integration.ts # Integración con Supabase
+│   ├── flows/
+│   │   └── UniaccFlow.ts          # 🎯 FLUJO ÚNICO INTELIGENTE
+│   ├── services/
+│   │   ├── UniaccChatService.ts   # 🎯 SERVICIO PRINCIPAL
+│   │   ├── ProspectServiceV2.ts   # Lógica de negocio
+│   │   ├── ValidationService.ts   # Validaciones
+│   │   ├── MessageFormatterService.ts
+│   │   └── service-factory.ts     # Factory simplificado
+│   ├── repositories/
+│   │   ├── PrismaProspectoRepository.ts
+│   │   ├── PrismaProspectoHistorialRepository.ts
+│   │   └── RepositoryFactory.ts
 │   ├── data/
 │   │   ├── programas-uniacc.ts    # Datos de facultades y carreras
 │   │   └── respuestas-predefinidas.ts # Respuestas del bot
 │   ├── utils/
-│   │   └── supabase-client.ts     # Cliente de Supabase
-│   └── index.ts                   # Servidor principal
+│   │   ├── supabase-client.ts     # Cliente de Supabase
+│   │   ├── validation-service.ts  # Validaciones
+│   │   └── whatsapp-sender.ts     # Envío de mensajes
+│   └── index-simplified.ts        # 🎯 ENTRY POINT PRINCIPAL
+├── public/
+│   └── test.html                  # 🎯 INTERFAZ DE TESTING
 ├── .env                           # Variables de entorno
-├── package.json
+├── package.json                   # Scripts simplificados
 └── tsconfig.json
 ```
 
 ### **Endpoints Principales:**
 
-#### 🔗 API Endpoints
+#### 🔗 API Endpoints Simplificados
 - **GET** `/` - Página principal del bot
-- **GET** `/chat` - Interfaz de chat interactiva
+- **GET** `/test` - 🎯 **Interfaz de testing web**
+- **POST** `/chat` - 🎯 **Endpoint principal de chat**
 - **POST** `/webhook` - Webhook para WhatsApp Business API
-- **POST** `/test-chat` - Endpoint para testing del chat
 - **GET** `/health` - Health check
-- **GET** `/stats` - Estadísticas del bot
 
-#### 🧠 Funcionalidades Clave
-- **Gestión de Estado:** Manejo de conversaciones por usuario con reset automático
-- **Sistema Anti-Duplicados:** 1 prospecto por flujo completado
-- **Flujos Conversacionales:** 
-  - Captura inicial de datos con validaciones
-  - Exploración de carreras por facultad
-  - Proceso de admisión 2025
-  - Información de costos y becas
-  - Modalidades de estudio
-  - Solicitud de asesor (nivel urgente)
-- **Reinicio Automático:** Reset del usuario post-guardado
-- **Integración WhatsApp:** Procesamiento de mensajes entrantes
-- **Persistencia:** Guardado de prospectos en Supabase con mapeo de tipos
+#### 🧠 Funcionalidades Clave Simplificadas
+- **🎯 Flujo Único Inteligente:** `UniaccFlow` maneja toda la lógica conversacional
+- **💾 Zero Data Loss:** Captura progresiva campo por campo mantenida
+- **🔄 Sistema Anti-Duplicados:** 1 prospecto por flujo completado
+- **👤 Reconocimiento de Usuarios:** Detección automática de usuarios recurrentes
+- **📱 Auto-Detección de Teléfono:** Extracción inteligente desde WhatsApp
+- **🎓 Exploración de Carreras:** 5 facultades con 13 carreras
+- **⚡ Respuestas Instantáneas:** Procesamiento directo sin capas complejas
+- **🔧 Testing Integrado:** Interfaz web en `/test` para desarrollo
+- **📊 Logging Completo:** Trazabilidad completa de conversaciones
 
-#### 🔄 Flujo de Conversación con Progressive Capture
+#### 🔄 Flujo Simplificado con UniaccFlow
 ```mermaid
 stateDiagram-v2
-    [*] --> captura_inicial
-    captura_inicial --> solicitar_nombre: Inicio captura
-    solicitar_nombre --> crear_prospecto: Nombre ingresado
-    crear_prospecto --> solicitar_email: DB: abandono solo nombre
-    solicitar_email --> actualizar_email: Email ingresado
-    actualizar_email --> solicitar_edad: DB: abandono con email
-    solicitar_edad --> actualizar_edad: Edad ingresada
-    actualizar_edad --> solicitar_region: DB: abandono con edad
-    solicitar_region --> actualizar_region: Región ingresada
-    actualizar_region --> solicitar_telefono: DB: abandono con region
-    solicitar_telefono --> finalizar_captura: Teléfono ingresado
-    finalizar_captura --> menu_principal: DB: captura completa
+    [*] --> greeting: Usuario escribe "hola"
     
-    menu_principal --> exploracion_carreras: Opción 1
-    menu_principal --> proceso_admision: Opción 2
-    menu_principal --> costos_becas: Opción 3
-    menu_principal --> modalidades: Opción 4
-    menu_principal --> hablar_asesor: Opción 5 (URGENTE)
+    greeting --> user_check: Detectar si es usuario recurrente
     
-    exploracion_carreras --> guardado_prospecto: Fin flujo
-    proceso_admision --> guardado_prospecto: Fin flujo
-    costos_becas --> guardado_prospecto: Fin flujo
-    modalidades --> guardado_prospecto: Fin flujo
-    hablar_asesor --> guardado_prospecto: Fin flujo
+    user_check --> capture: Usuario nuevo
+    user_check --> menu: Usuario recurrente
     
-    guardado_prospecto --> reset_usuario: Reset automático
-    reset_usuario --> [*]: "Escribe Hola para nueva consulta"
+    capture --> phone_confirmation: Confirmar teléfono detectado
+    phone_confirmation --> name_request: Teléfono confirmado
+    name_request --> email_request: Nombre ingresado
+    email_request --> age_request: Email ingresado  
+    age_request --> region_request: Edad ingresada
+    region_request --> menu: Región ingresada
     
-    note right of crear_prospecto: 🆕 Cada campo se\nguarda inmediatamente
-    note right of actualizar_email: 🆕 Sin pérdida de datos
-    note right of actualizar_edad: 🆕 Clasificación granular
-    note right of actualizar_region: 🆕 de abandono por nivel
+    menu --> careers: Opción 1 - Carreras
+    menu --> admission: Opción 2 - Admisión
+    menu --> costs: Opción 3 - Costos
+    menu --> modalities: Opción 4 - Modalidades
+    menu --> advisor: Opción 5 - Asesor (URGENTE)
+    
+    careers --> faculty_selection: Selección facultad
+    faculty_selection --> career_details: Detalle carrera
+    career_details --> advisor_request: Solicitar asesor
+    
+    admission --> advisor_request: Info admisión
+    costs --> advisor_request: Info costos
+    modalities --> advisor_request: Info modalidades
+    
+    advisor_request --> save_prospect: Guardar prospecto
+    save_prospect --> reset: Reset automático
+    reset --> [*]: "Escribe hola para nueva consulta"
+    
+    note right of greeting: 🎯 UniaccFlow maneja todo
+    note right of capture: 💾 Zero Data Loss
+    note right of save_prospect: 🔄 Anti-duplicados
 ```
 
-#### 🎯 Sistema de Clasificación de Prospectos
-- **Consulta General** - Flujo básico informativo
-- **Exploración de Carreras** - Interés académico específico  
-- **Proceso de Admisión** - Información sobre ingreso
-- **Costos y Becas** - Interés en financiamiento
-- **Modalidades de Estudio** - Interés en formatos de estudio
-- **Solicitud de Asesor** - Prioridad URGENTE
+#### 🎯 Sistema de Clasificación Simplificado
+- **👤 Usuario Nuevo** - Captura completa de datos
+- **🔄 Usuario Recurrente** - Menú contextual personalizado
+- **🎓 Exploración de Carreras** - 5 facultades, 13 carreras
+- **📋 Proceso de Admisión** - Información 2025
+- **💰 Costos y Becas** - Información financiera
+- **🎯 Solicitud de Asesor** - Prioridad URGENTE
 
-#### 🆕 Progressive Capture States (NUEVO)
-1. **🔄 captura en proceso** - Usuario iniciando captura de datos
-2. **⚠️ abandono solo nombre** - Usuario ingresó solo nombre y abandonó
-3. **⚠️ abandono con email** - Usuario llegó hasta email y abandonó
-4. **⚠️ abandono con edad** - Usuario llegó hasta edad y abandonó
-5. **⚠️ abandono con region** - Usuario llegó hasta región y abandonó
-6. **❌ abandono incompleto** - Abandono sin datos suficientes
-7. **✅ captura completa** - Usuario completó todos los campos básicos
-
----
-
-## 🎨 Dashboard Frontend
-
-### **Puerto:** 3000
-### **Tecnología:** Vue.js 3 + Vite + TypeScript
-
-```
-dashboard/
-├── src/
-│   ├── components/
-│   │   ├── chat/
-│   │   │   ├── ChatInterface.vue    # Interfaz principal de chat
-│   │   │   ├── ChatSidebar.vue      # Lista de conversaciones
-│   │   │   └── MessageInput.vue     # Input de mensajes
-│   │   ├── layout/
-│   │   │   ├── Header.vue           # Header principal
-│   │   │   └── Sidebar.vue          # Navegación lateral
-│   │   └── prospectos/
-│   │       ├── ProspectosList.vue   # Lista con filtros de urgencia
-│   │       └── ProspectoDetail.vue  # Detalle de prospecto
-│   ├── composables/
-│   │   ├── useChat.ts               # Lógica de chat
-│   │   ├── useProspectos.ts         # Gestión de prospectos
-│   │   ├── useMetricas.ts           # Métricas y estadísticas
-│   │   ├── useSupabase.ts           # Cliente Supabase
-│   │   └── useEjecutivos.ts         # Gestión de ejecutivos
-│   ├── views/
-│   │   ├── Dashboard.vue            # Dashboard principal
-│   │   ├── Chat.vue                 # Vista de chat
-│   │   ├── ProspectosView.vue       # Gestión con filtros
-│   │   └── Metricas.vue             # Análisis y métricas
-│   ├── types/
-│   │   └── index.ts                 # Tipos TypeScript
-│   └── main.ts                      # Entrada de la aplicación
-├── vite.config.ts                   # Configuración de Vite
-└── package.json
-```
-
-### **Características Principales:**
-- **Chat en Tiempo Real:** Interfaz para gestionar conversaciones
-- **Gestión de Prospectos:** CRUD completo de leads con identificación visual de urgencia
-- **Filtros Avanzados:** Por tipo de consulta y nivel de interés
-- **Métricas y Analytics:** Dashboards con estadísticas de conversión
-- **Identificación de Urgencia:** Destacado visual de prospectos urgentes
-- **Responsive Design:** Optimizado para desktop y mobile
-- **TypeScript:** Tipado fuerte para mejor desarrollo
-
----
-
-## 🔌 Dashboard API Server
-
-### **Puerto:** 3002
-### **Tecnología:** Node.js + Express
-
-```
-dashboard/
-├── server.js                        # Servidor API con lógica de mapeo
-├── package.json
-└── .env
-```
-
-### **Endpoints API:**
-
-#### 📊 Prospectos y Webhooks
-- **POST** `/api/interacciones` - Registrar interacción del bot
-- **POST** `/api/botpress-webhook` - Webhook principal para prospectos
-- **GET** `/api/prospectos` - Listar todos los prospectos
-
-#### 💬 Conversaciones
-- **GET** `/api/conversaciones` - Listar conversaciones
-- **GET** `/api/conversaciones/:id/mensajes` - Mensajes de una conversación
-
-#### 📊 Estadísticas
-- **GET** `/api/stats` - Métricas generales del sistema
-
-#### 🔧 Sistema
-- **GET** `/health` - Health check del API
-
-### **Funcionalidades Avanzadas:**
-- **Mapeo Automático de Tipos de Consulta:**
-  - `consulta_general` → `consulta general`
-  - `costos_becas` → `consulta costos y/o becas`
-  - `modalidades_estudio` → `consulta modalidades de estudio`
-  - `hablar_asesor` → `solicitud de asesor`
-- **Gestión de Niveles de Interés:**
-  - Automático: `alto` para consultas generales
-  - Prioritario: `urgente` para solicitudes de asesor
-- **Validación de Constraints:** Verificación de valores permitidos
-- **Proxy para Supabase:** Manejo seguro de conexiones a BD
-- **Gestión de Errores:** Respuestas estructuradas de error
-- **CORS Configurado:** Permite conexiones desde el frontend
+#### 🆕 Estados de Captura Simplificados
+1. **📱 Teléfono Confirmado** - Auto-detección desde WhatsApp
+2. **👤 Datos Básicos** - Nombre, email, edad, región
+3. **🎓 Interés Académico** - Carrera y facultad de interés
+4. **✅ Captura Completa** - Prospecto listo para asesor
 
 ---
 
@@ -524,36 +459,26 @@ sequenceDiagram
 
 ---
 
-## 🚪 Configuración de Puertos
+## 🚪 Configuración de Puertos Simplificada
 
 | Puerto | Servicio | URL | Estado |
 |--------|----------|-----|--------|
-| **3000** | Dashboard Frontend | http://localhost:3000 | ✅ Desarrollo |
-| **3001** | ChatBot Backend | http://localhost:3001 | ✅ Desarrollo |
-| **3002** | Dashboard API Server | http://localhost:3002 | ✅ Desarrollo |
+| **3001** | ChatBot Simplificado | http://localhost:3001 | ✅ Desarrollo |
 
-### **Configuración Proxy (Vite):**
-```typescript
-// dashboard/vite.config.ts
-server: {
-  port: 3000,
-  proxy: {
-    '/api': {
-      target: 'http://localhost:3002',
-      changeOrigin: true,
-      secure: false
-    }
-  }
-}
-```
+### **URLs de Desarrollo:**
+- **🎯 Testing Principal:** http://localhost:3001/test
+- **🔗 API Chat:** http://localhost:3001/chat
+- **🏥 Health Check:** http://localhost:3001/health
 
-### **Scripts de Desarrollo:**
+### **Scripts Simplificados:**
 ```json
 {
   "scripts": {
-    "dev:full": "concurrently \"npm run dev\" \"npm run dev:api\"",
-    "dev": "vite --host",
-    "dev:api": "node server.js"
+    "simplified:dev": "tsx src/index-simplified.ts",
+    "simplified:dev:watch": "tsx watch src/index-simplified.ts",
+    "simplified:build": "tsc",
+    "simplified:start": "node dist/index-simplified.js",
+    "simplified:test": "tsx src/index-simplified.ts"
   }
 }
 ```
@@ -611,85 +536,103 @@ VITE_PORT=3000
 
 ---
 
-## 📁 Estructura de Archivos
+## 📁 Estructura de Archivos Simplificada
 
 ```
 chatboot-uniacc/
-├── 📁 chatbot/                     # Backend del ChatBot
+├── 📁 chatbot/                     # 🎯 BACKEND SIMPLIFICADO
 │   ├── 📁 src/
-│   │   ├── 📁 actions/
-│   │   │   ├── 📄 uniacc-scripts.ts          # Sistema anti-duplicados
-│   │   │   └── 📄 supabase-integration.ts    # Integración avanzada
+│   │   ├── 📁 flows/
+│   │   │   └── 📄 UniaccFlow.ts              # 🎯 FLUJO ÚNICO INTELIGENTE
+│   │   ├── 📁 services/
+│   │   │   ├── 📄 UniaccChatService.ts       # 🎯 SERVICIO PRINCIPAL
+│   │   │   ├── 📄 ProspectServiceV2.ts       # Lógica de negocio
+│   │   │   ├── 📄 ValidationService.ts       # Validaciones
+│   │   │   ├── 📄 MessageFormatterService.ts # Formateo de mensajes
+│   │   │   └── 📄 service-factory.ts         # Factory simplificado
+│   │   ├── 📁 repositories/
+│   │   │   ├── 📄 PrismaProspectoRepository.ts
+│   │   │   ├── 📄 PrismaProspectoHistorialRepository.ts
+│   │   │   └── 📄 RepositoryFactory.ts
 │   │   ├── 📁 data/
 │   │   │   ├── 📄 programas-uniacc.ts        # Datos UNIACC
 │   │   │   └── 📄 respuestas-predefinidas.ts # Respuestas del bot
 │   │   ├── 📁 utils/
-│   │   │   └── 📄 supabase-client.ts         # Cliente configurado
-│   │   └── 📄 index.ts                       # Servidor principal
+│   │   │   ├── 📄 supabase-client.ts         # Cliente configurado
+│   │   │   ├── 📄 validation-service.ts      # Validaciones
+│   │   │   └── 📄 whatsapp-sender.ts         # Envío de mensajes
+│   │   └── 📄 index-simplified.ts            # 🎯 ENTRY POINT PRINCIPAL
+│   ├── 📁 public/
+│   │   └── 📄 test.html                      # 🎯 INTERFAZ DE TESTING
 │   ├── 📄 .env
-│   ├── 📄 package.json
+│   ├── 📄 package.json                       # Scripts simplificados
 │   └── 📄 tsconfig.json
-├── 📁 dashboard/                   # Frontend y API del Dashboard
-│   ├── 📁 src/                     # Frontend Vue.js
+├── 📁 dashboard/                   # Dashboard (mantenido)
+│   ├── 📁 src/
 │   │   ├── 📁 components/
 │   │   ├── 📁 composables/
 │   │   ├── 📁 views/
-│   │   │   └── 📄 ProspectosView.vue         # Vista con urgencias
 │   │   └── 📄 main.ts
-│   ├── 📁 src/server/api/          # Lógica de API separada
-│   │   └── 📄 botpress-webhook.ts            # Webhook principal
-│   ├── 📄 server.js               # API Server con mapeo
-│   ├── 📄 vite.config.ts
+│   ├── 📄 server.js               # API Server
 │   └── 📄 package.json
-├── 📁 .claude/                     # Archivos de configuración
-│   ├── 📄 supabase_config_actual.sql        # Schema actualizado
-│   └── 📄 project-context.json              # Contexto del proyecto
-├── 📄 arquitectura.md             # Este archivo
-└── 📄 README.md                   # Documentación principal
+├── 📁 docs/                        # Documentación
+│   ├── 📄 arquitectura.md         # Este archivo
+│   ├── 📄 CLAUDE.md               # Guía para desarrolladores
+│   └── 📄 flujo.md                # Guía de flujos
+├── 📄 README.md                   # Documentación principal
+└── 📄 package.json                # Scripts del proyecto
 ```
 
 ---
 
-## 🚀 Comandos de Desarrollo
+## 🚀 Comandos de Desarrollo Simplificados
 
-### **Levantar todos los servicios:**
+### **🎯 Desarrollo del ChatBot (RECOMENDADO):**
 
 ```bash
-# Opción 1: Todo en uno (RECOMENDADO)
-cd dashboard
-npm run dev:full
-
-# Opción 2: Por separado (3 terminales)
-# Terminal 1: ChatBot Backend
+# Desarrollo con hot reload
 cd chatbot
-npm run dev
+npm run simplified:dev
 
-# Terminal 2: Dashboard API Server  
-cd dashboard
-npm run dev:server
-
-# Terminal 3: Dashboard Frontend
-cd dashboard
-npm run dev
+# Testing en navegador
+# Abrir: http://localhost:3001/test
 ```
 
-### **Comandos útiles:**
+### **🔧 Comandos Útiles:**
 
 ```bash
 # Build para producción
-npm run build
+cd chatbot
+npm run simplified:build
+
+# Ejecutar en producción
+npm run simplified:start
+
+# Desarrollo con watch
+npm run simplified:dev:watch
 
 # Verificar tipos TypeScript
-npm run typecheck
+npx tsc --noEmit
 
-# Ejecutar tests
-npm run test
-
-# Logs del sistema
-tail -f chatbot/logs/bot.log
-
-# Limpiar y reinstalar dependencias
+# Limpiar y reinstalar
 rm -rf node_modules && npm install
+```
+
+### **📊 Testing del Sistema:**
+
+```bash
+# 1. Iniciar servidor
+cd chatbot && npm run simplified:dev
+
+# 2. Abrir interfaz de testing
+# http://localhost:3001/test
+
+# 3. Probar flujo completo:
+# - Escribir "hola"
+# - Confirmar teléfono
+# - Completar datos
+# - Explorar carreras
+# - Solicitar asesor
 ```
 
 ---
@@ -803,22 +746,191 @@ rm -rf node_modules && npm install
 
 ---
 
-**Última actualización:** 28 de Agosto, 2025  
-**Versión:** 3.0.0 - Progressive Capture System  
+## 👨‍💻 Guía para Desarrolladores
+
+### **🎯 Cómo Crear un Nuevo Flujo (Paso a Paso)**
+
+#### **Paso 1: Entender la Arquitectura Actual**
+```typescript
+// UniaccFlow.ts - Flujo único que maneja todo
+export class UniaccFlow {
+  async processMessage(userId: string, message: string, state: SimpleState): Promise<FlowResponse> {
+    switch (state.step) {
+      case 'greeting': return this.handleGreeting(userId, message, state)
+      case 'capture': return this.handleDataCapture(userId, message, state)
+      case 'menu': return this.handleMainMenu(userId, message, state)
+      case 'careers': return this.handleCareerExploration(userId, message, state)
+      case 'advisor': return this.handleAdvisorRequest(userId, message, state)
+      default: return this.handleGreeting(userId, message, state)
+    }
+  }
+}
+```
+
+#### **Paso 2: Identificar el Punto de Entrada**
+```typescript
+// Ejemplo: Agregar nuevo flujo "becas"
+case 'menu': return this.handleMainMenu(userId, message, state)
+
+// En handleMainMenu, agregar nueva opción:
+if (message === '6') {
+  state.step = 'becas'
+  return {
+    message: '🎓 Información de Becas UNIACC...',
+    completed: false,
+    nextStep: 'becas'
+  }
+}
+```
+
+#### **Paso 3: Crear el Nuevo Handler**
+```typescript
+private async handleBecasInfo(userId: string, message: string, state: SimpleState): Promise<FlowResponse> {
+  // Tu lógica aquí
+  const becasInfo = this.getBecasInformation()
+  
+  return {
+    message: becasInfo,
+    completed: false,
+    nextStep: 'menu' // Volver al menú principal
+  }
+}
+```
+
+#### **Paso 4: Agregar al Switch Principal**
+```typescript
+case 'becas': return this.handleBecasInfo(userId, message, state)
+```
+
+#### **Paso 5: Probar el Nuevo Flujo**
+1. Ejecutar: `npm run simplified:dev`
+2. Abrir: http://localhost:3001/test
+3. Probar: "hola" → "6" → verificar respuesta
+
+### **🔧 Estructura de Archivos Clave**
+
+#### **UniaccFlow.ts** - Flujo Principal
+```typescript
+// Métodos principales:
+- processMessage()      // Punto de entrada
+- handleGreeting()      // Saludo inicial
+- handleDataCapture()   // Captura de datos
+- handleMainMenu()      // Menú principal
+- handleCareerExploration() // Exploración carreras
+- handleAdvisorRequest()    // Solicitud asesor
+```
+
+#### **UniaccChatService.ts** - Orquestador
+```typescript
+// Responsabilidades:
+- Gestionar estado del usuario
+- Coordinar UniaccFlow
+- Manejar persistencia
+- Formatear respuestas
+```
+
+#### **ProspectServiceV2.ts** - Lógica de Negocio
+```typescript
+// Métodos principales:
+- guardarProspecto()    // Guardar prospecto
+- actualizarProspecto() // Actualizar datos
+- buscarProspecto()     // Buscar existente
+```
+
+### **📝 Convenciones de Código**
+
+#### **Naming Conventions:**
+```typescript
+// Métodos: camelCase
+handleGreeting()
+handleDataCapture()
+
+// Variables: camelCase
+const userName = 'Juan'
+const userEmail = 'juan@email.com'
+
+// Estados: snake_case
+state.step = 'greeting'
+state.needsData = ['telefono', 'nombre']
+```
+
+#### **Estructura de Respuestas:**
+```typescript
+interface FlowResponse {
+  message: string        // Mensaje al usuario
+  completed: boolean     // ¿Flujo completado?
+  nextStep?: string      // Siguiente paso
+  data?: any            // Datos adicionales
+}
+```
+
+#### **Manejo de Estado:**
+```typescript
+interface SimpleState {
+  step: string          // Paso actual
+  needsData?: string[]  // Datos pendientes
+  capturedData?: any    // Datos capturados
+}
+```
+
+### **🚨 Errores Comunes y Soluciones**
+
+#### **Error: "Cannot read property of undefined"**
+```typescript
+// ❌ Malo
+const user = await this.prospectoRepo.findByWhatsapp(userId)
+const name = user.nombre // Error si user es null
+
+// ✅ Bueno
+const user = await this.prospectoRepo.findByWhatsapp(userId)
+const name = user?.nombre || 'Usuario'
+```
+
+#### **Error: "State not found"**
+```typescript
+// ❌ Malo
+if (state.step === 'invalid_step') { ... }
+
+// ✅ Bueno
+const validSteps = ['greeting', 'capture', 'menu', 'careers', 'advisor']
+if (!validSteps.includes(state.step)) {
+  state.step = 'greeting' // Reset seguro
+}
+```
+
+### **🧪 Testing y Debugging**
+
+#### **Console Logs Útiles:**
+```typescript
+console.log('🎯 [FLOW] Procesando paso:', state.step)
+console.log('👤 [USER] ID:', userId, 'Mensaje:', message)
+console.log('💾 [DATA] Datos capturados:', state.capturedData)
+```
+
+#### **Testing Manual:**
+1. **Flujo Completo:** "hola" → completar datos → explorar carreras → solicitar asesor
+2. **Usuario Recurrente:** "hola" → verificar menú contextual
+3. **Datos Inválidos:** Probar emails/teléfonos incorrectos
+4. **Timeouts:** Dejar inactivo y verificar persistencia
+
+---
+
+**Última actualización:** Enero 2025  
+**Versión:** 4.0.0 - Arquitectura Ultra-Simplificada  
 **Autor:** Juan Pablo Silva feat Claude AI
 
 ---
 
-## 🎯 Resumen de Arquitectura
+## 🎯 Resumen de Arquitectura Simplificada
 
-Esta arquitectura implementa un **sistema completo de captación de prospectos con Progressive Capture** que incluye:
-- **🆕 Zero Data Loss** - Progressive Capture elimina pérdida de datos por abandono
-- **🆕 Análisis Granular de Abandono** - 7 estados detallados de captura por campo
-- **Zero duplicados** garantizados por flujo
-- **Clasificación inteligente** de prioridades y completación
-- **Dashboard operativo** para gestión en tiempo real con vistas progressive
-- **Escalabilidad** probada con microservicios
-- **Base de datos robusta** con constraints y optimizaciones para progressive capture
-- **🆕 Timeout Inteligente** - Preserva y clasifica datos parciales automáticamente
+Esta arquitectura ultra-simplificada implementa un **sistema completo de captación de prospectos** que incluye:
+- **🎯 Flujo Único Inteligente** - UniaccFlow maneja toda la lógica
+- **💾 Zero Data Loss** - Captura progresiva campo por campo
+- **🔄 Sistema Anti-Duplicados** - 1 prospecto por flujo completado
+- **👤 Reconocimiento Inteligente** - Usuarios recurrentes automáticos
+- **📱 Auto-Detección** - Teléfono desde WhatsApp automático
+- **⚡ Respuestas Instantáneas** - Sin capas complejas
+- **🔧 Testing Integrado** - Interfaz web para desarrollo
+- **📊 Logging Completo** - Trazabilidad total
 
-El sistema está **listo para producción** con Progressive Capture System completamente funcional y preparado para integración con WhatsApp Business API real.
+El sistema está **listo para producción** con arquitectura ultra-limpia, fácil mantenimiento y preparado para integración con WhatsApp Business API real.
